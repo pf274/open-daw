@@ -2,6 +2,8 @@
 /** Song view sidebar: every pattern, draggable onto the song; Edit opens the pattern editor. */
 import { project, patternLength, barLen } from '../stores/project.js';
 import { newPattern, duplicatePattern, deletePattern, editPattern, clipCount, choosePattern, PATTERN_MIME } from '../engine/song.js';
+import { ui } from '../stores/ui.js';
+import { device } from '../stores/device.js';
 
 function onDragStart(e, p) {
   e.dataTransfer.setData(PATTERN_MIME, String(p.id));
@@ -17,13 +19,14 @@ function onDelete(p) {
 function onCardClick(e, p) {
   if (e.target.closest('input, button')) return;
   choosePattern(p.id);
+  if (device.narrow) ui.drawer = false; // phones: back to the song, ready to double-tap a track
 }
 const bars = (p) => Math.round(patternLength(p) / barLen());
 </script>
 
 <template>
-  <p class="help top">Click a pattern to select it, then double-click a track to place it, or drag it onto a track.</p>
-  <div v-for="p in project.patterns" :key="p.id" class="pattern" :class="{ current: p.id === project.curPattern }"
+  <p class="help top">{{ device.coarse ? 'Tap a pattern to select it, then double-tap a track to place it.' : 'Click a pattern to select it, then double-click a track to place it, or drag it onto a track.' }}</p>
+  <div v-for="p in project.patterns" :key="p.id" class="pattern" :class="{ current: p.id === project.curPattern && ui.placeSound == null }"
     draggable="true" role="button" tabindex="0" :aria-pressed="p.id === project.curPattern"
     :title="`Click to select “${p.name}” (double-click a track to place it), or drag it onto a track`"
     @dragstart="onDragStart($event, p)" @click="onCardClick($event, p)" @keydown.enter.self="choosePattern(p.id)">

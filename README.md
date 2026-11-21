@@ -72,6 +72,19 @@ Switch views with **🎼 Song** / **🎹 <pattern name>** in the header.
 
 Older project files open as a single pattern placed at bar 1 of a new song.
 
+## Phones and tablets
+
+The app works on touch screens and narrow windows.
+
+- **Layout:** on a phone-sized screen the side panel (patterns, layers, sounds) slides in from the left. Open it with **☰** and close it with ✕ or by tapping outside it. The toolbar is a single row that you swipe sideways. In the Song view, each track and automation row shows its name and a **⋯** button. The ⋯ menu has mute and solo (on/off for automation), **Change colour…**, move up/down, and delete. Small **M** / **S** / **Off** badges next to the name show what's switched on.
+- **Piano roll:** drag a note to move it, or drag its right end to resize it. Drag empty space to scroll and pinch with two fingers to zoom. **Double-tap** adds a note, or deletes the note you tap. **Long-press** opens the menu that right-click opens on a computer. A tap without dragging clears the selection.
+- **Recording:** a microphone works as usual. Instead of pressing a key, **tap the roll** on each note. Tapping the roll with a mouse works the same way.
+- **Pick mode:** hold a key on the keyboard strip at the left to try that pitch, and keep holding to confirm it. The pick-mode box has buttons for previous and next note, octave (or drum bank), hearing the phrase, confirming, and finishing.
+- **Song view:** swipe to scroll and use **− / +** in the top-left corner to zoom. Drag-and-drop from the side panel isn't available on touch screens. Instead, tap a pattern or a **sound** in the side panel (it closes so you can see the song), then **double-tap** a track to place it. Double-tap a clip to open it, drag clips to move them, drag their edges to shorten them, and long-press for the clip menu. Box selection is for a mouse or pen; on touch, a drag scrolls.
+- On touch screens, buttons and drag handles are bigger, and the ✕ delete buttons stay visible because there's no hover.
+
+Sounds can also be selected with a mouse: click a sound in the list, then double-click a track to place it.
+
 ## Light and dark mode
 
 The **☀ / ☾** button at the right of the toolbar switches between light and dark. **Settings → Appearance → Theme** has three choices: **System** (the default), **Light** and **Dark**. System follows your computer's setting and changes when it does. Your choice is remembered in this browser.

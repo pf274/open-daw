@@ -50,14 +50,16 @@ export const ui = reactive({
   headW: loadHeadW(), // song view: width of the track-header column (px), resizable
   songSnap: 1,        // song view grid: 'bar', or counted beats (1, ½, ¼); 0 = off
   autoSel: null,      // selected automation point: { id (automation track), index }
+  placeSound: null,   // a sound picked in the list (or as a clip): double-clicking empty space places it instead of the pattern
   clipClipboard: null, // copied clips: { clips: [{ patternId, offset, lane }], length, top }
 
   // chrome
   theme: loadThemePref(), // 'system' | 'light' | 'dark' (see stores/theme.js)
   themeResolved: 'dark',  // what's showing: 'light' | 'dark'
-  tab: loadTab(),   // 'file' | 'settings' | null (collapsed)
+  tab: loadTab(),
+  drawer: false,    // phones: the sidebar slid open   // 'file' | 'settings' | null (collapsed)
   status: { msg: 'Ready.', warn: false },
-  ctxMenu: { open: false, kind: 'note', x: 0, y: 0, beat: 0, trackId: null }, // kind: 'note' (piano roll) | 'clip' (song view)
+  ctxMenu: { open: false, kind: 'note', x: 0, y: 0, beat: 0, trackId: null, items: null, serial: 0 }, // kind: 'note' (piano roll) | 'clip' (song view) | 'custom' (`items` given by the opener)
   tremorModal: { open: false, depth: 30, rate: 5.5 },
   quantizeModal: { open: false, grid: 0, strength: 100, ends: false },
   synthModal: { open: false, trackId: null, patch: null }, // patch = unsaved working copy

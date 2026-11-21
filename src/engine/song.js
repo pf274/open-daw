@@ -233,10 +233,20 @@ export function pasteClips({ at = ui.songPlayhead, lane = ui.clipClipboard?.top 
 
 /** Select a pattern (for placing with double-click) without leaving the Song view. `quiet`: no status message (e.g. selecting one of its clips). */
 export function choosePattern(id, { quiet = false } = {}) {
-  if (!patternById(id) || project.curPattern === id) return;
+  if (!patternById(id)) return;
+  ui.placeSound = null; // the pattern is what gets placed now
+  if (project.curPattern === id) return;
   setCurPattern(id);
   ui.sel.clear();
   if (!quiet) status(`Selected "${patternById(id).name}": drag it onto a track, or double-click an empty spot to place it.`);
+}
+
+/** Select a sound to place with double-click / double-tap (a touch screen can't drag it from the list). */
+export function chooseSound(id, { quiet = false } = {}) {
+  const s = soundById(id);
+  if (!s) return;
+  ui.placeSound = id;
+  if (!quiet) status(`Selected "${s.name}": double-click (or double-tap) an empty spot on a track to place it.`);
 }
 
 /* ---------------- truncating clips ---------------- */

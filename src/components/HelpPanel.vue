@@ -1,8 +1,19 @@
+<script setup>
+import { device } from '../stores/device.js';
+</script>
+
 <template>
   <details>
     <summary>How to use</summary>
+    <p v-if="device.coarse" class="help">
+      <b>Touch:</b> ☰ opens this panel. In the roll, drag a note to move it (its right end resizes it), drag empty space to scroll,
+      pinch to zoom, <b>double-tap</b> to add or delete a note, and <b>long-press</b> for the menu (copy, transpose, quantize…).
+      While recording, <b>tap the roll</b> on each note. In pick mode, hold a key on the left keyboard to choose its pitch.<br>
+      <b>Song:</b> tap a pattern or sound in this panel, then double-tap a track to place it. Drag clips to move them, drag their
+      edges to shorten them, long-press for the clip menu, and use − / + to zoom.
+    </p>
     <p class="help">
-      1. Click <b>🎤 Mic</b> and whistle; the readout shows the detected note.<br>
+      1. Metronome <b>🎤 Mic</b> and whistle; the readout shows the detected note.<br>
       2. Select a layer, put the playhead where you want to start, press <b>● Rec</b> (or R).<br>
       3. After the count-in, whistle the melody and <b>tap any key</b> on each note. Esc stops.<br>
       4. Fix notes in the roll, add layers, then <b>File → Export</b>.

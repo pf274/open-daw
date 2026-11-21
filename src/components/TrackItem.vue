@@ -27,7 +27,7 @@ function onInstrument(e) {
 </script>
 
 <template>
-  <div class="track" :class="{ sel: selected }" @mousedown="$emit('select')">
+  <div class="track" :class="{ sel: selected }" @pointerdown="$emit('select')">
     <div class="row">
       <span class="dot" :style="{ background: track.color }"></span>
       <input v-model="track.name" class="name">

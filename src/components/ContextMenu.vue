@@ -22,16 +22,18 @@ watch(() => ui.ctxMenu.open && [ui.ctxMenu.x, ui.ctxMenu.y], async (open) => {
 });
 
 const close = (e) => { if (ui.ctxMenu.open && !el.value?.contains(e.target)) ui.ctxMenu.open = false; };
-onMounted(() => window.addEventListener('mousedown', close, true));
-onUnmounted(() => window.removeEventListener('mousedown', close, true));
+onMounted(() => window.addEventListener('pointerdown', close, true)); // pointer: closes on touch too
+onUnmounted(() => window.removeEventListener('pointerdown', close, true));
 </script>
 
 <template>
   <div v-if="ui.ctxMenu.open" ref="el" class="ctx" :style="{ left: pos.left + 'px', top: pos.top + 'px' }" @contextmenu.prevent>
-    <MenuList :key="ui.ctxMenu.kind" :items="MENUS[ui.ctxMenu.kind] || MENUS.note" @done="ui.ctxMenu.open = false" />
+    <MenuList :key="ui.ctxMenu.kind === 'custom' ? `custom-${ui.ctxMenu.serial}` : ui.ctxMenu.kind"
+      :items="ui.ctxMenu.kind === 'custom' ? ui.ctxMenu.items : MENUS[ui.ctxMenu.kind] || MENUS.note" @done="ui.ctxMenu.open = false" />
   </div>
 </template>
 
 <style scoped>
-.ctx { position: fixed; z-index: 20; }
+.ctx { position: fixed; z-index: 20; max-height: calc(100dvh - 8px); overflow-y: auto; border-radius: 8px; }
+@media (min-width: 761px) { .ctx { overflow: visible; max-height: none; } } /* flyout submenus need to stick out */
 </style>

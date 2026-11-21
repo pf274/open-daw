@@ -39,6 +39,7 @@ const liveNote = useFrameValue(() => {
 <template>
   <header>
     <div class="bar top">
+      <button class="menu-btn" :class="{ on: ui.drawer }" :aria-expanded="ui.drawer" aria-label="Side panel" title="Patterns, layers and sounds" @click="ui.drawer = !ui.drawer">☰</button>
       <nav class="tabs" role="tablist">
         <button v-for="t in TABS" :key="t.id" role="tab" class="tab" :class="{ current: ui.tab === t.id }"
           :aria-selected="ui.tab === t.id" :title="ui.tab === t.id ? 'Click to collapse' : ''" @click="setTab(t.id)">
@@ -66,7 +67,7 @@ const liveNote = useFrameValue(() => {
 
       <div class="group">
         <label>BPM <input type="number" min="30" max="300" step="1" :value="project.bpm" :disabled="transport.playing" @change="onBpm"></label>
-        <button :class="{ on: ui.metronome }" title="Metronome click while recording/playing" @click="ui.metronome = !ui.metronome">Click</button>
+        <button :class="{ on: ui.metronome }" title="Metronome click while recording/playing" @click="ui.metronome = !ui.metronome">Metronome</button>
       </div>
 
       <div class="group">
@@ -107,4 +108,17 @@ const liveNote = useFrameValue(() => {
 .live-note { min-width: 86px; font-variant-numeric: tabular-nums; color: var(--dim); }
 .live-note.active { color: var(--text); }
 .theme { margin-left: auto; min-width: 30px; }
+.menu-btn { display: none; min-width: 34px; }
+@media (max-width: 760px) {
+  /* one row that scrolls sideways instead of wrapping into several */
+  .top { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; padding: 0 6px; }
+  .top::-webkit-scrollbar { display: none; }
+  .top > * { flex: none; }
+  .menu-btn { display: inline-block; }
+  .tab { padding: 0 9px; }
+  .group { padding-right: 6px; }
+  .views button { max-width: 120px; }
+  .theme { margin-left: 0; }
+  .panel { max-height: 45vh; overflow-y: auto; padding: 6px; }
+}
 </style>

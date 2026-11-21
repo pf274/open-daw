@@ -33,7 +33,7 @@ async function openMenu(w, ids) {
 }
 const menuButton = (w, label) => w.findAll('.ctx button').find((b) => b.text().startsWith(label));
 async function hoverSub(w, label) {
-  await menuButton(w, label).element.parentElement.dispatchEvent(new Event('mouseenter'));
+  await menuButton(w, label).element.parentElement.dispatchEvent(new Event('pointerenter'));
   await flushPromises();
 }
 const tab = (w, label) => w.findAll('[role=tab]').find((b) => b.text() === label);

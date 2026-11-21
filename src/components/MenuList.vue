@@ -14,13 +14,15 @@ const resolve = (x) => (typeof x === 'function' ? x() : x);
 const enabled = (it) => !it.enabled || it.enabled();
 const kind = (it) => (it == null ? 'sep' : it.header != null ? 'header' : it.stepper ? 'stepper' : 'item');
 
+/** Hovering opens submenus for a mouse; a finger's "hover" comes with its tap, which toggles them itself. */
+const hover = (e, i, it) => { if (e.pointerType !== 'touch') openSub(i, it); };
 async function openSub(i, it) {
   open.value = it.children && enabled(it) ? i : -1;
   subStyle.value = {};
   if (open.value < 0) return;
   await nextTick();
   const el = subEl?.$el;
-  if (!el) return;
+  if (!el || window.matchMedia?.('(max-width: 760px)').matches) return; // phones: submenus open inline
   // keep the submenu on screen: flip left if needed, and nudge up near the bottom
   const r = el.getBoundingClientRect();
   const style = {};
@@ -41,17 +43,17 @@ function click(i, it) {
     <template v-for="(it, i) in items" :key="i">
       <hr v-if="kind(it) === 'sep'">
       <div v-else-if="kind(it) === 'header'" class="head">{{ resolve(it.header) }}</div>
-      <div v-else-if="kind(it) === 'stepper'" class="stepper" :title="it.title ? it.title() : ''" @mouseenter="open = -1">
+      <div v-else-if="kind(it) === 'stepper'" class="stepper" :title="it.title ? it.title() : ''" @pointerenter="open = -1">
         <span class="label">{{ it.label }}</span>
         <button class="step" aria-label="Down" @click="it.dec()">−</button>
         <span class="value">{{ resolve(it.value) }}</span>
         <button class="step" aria-label="Up" @click="it.inc()">+</button>
         <button v-if="it.reset" class="step" title="Reset" @click="it.reset()">↺</button>
       </div>
-      <div v-else class="row" @mouseenter="openSub(i, it)">
+      <div v-else class="row" @pointerenter="hover($event, i, it)">
         <button :disabled="!enabled(it)" :class="{ active: open === i }" :title="it.title ? it.title() : ''"
           role="menuitem" @click="click(i, it)">
-          {{ it.label }}<span class="keys">{{ it.children ? '▸' : it.keys }}</span>
+          {{ resolve(it.label) }}<span class="keys" :class="{ arrow: it.children }">{{ it.children ? '▸' : it.keys }}</span>
         </button>
         <MenuList v-if="open === i" :ref="(c) => (subEl = c)" class="sub" :style="subStyle"
           :items="resolve(it.children)" @done="emit('done')" />
@@ -73,5 +75,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .stepper { display: flex; align-items: center; gap: 4px; padding: 3px 6px 3px 9px; }
 .stepper .label { flex: 1; }
 .stepper .value { min-width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
+@media (pointer: coarse) { .keys:not(.arrow) { display: none; } } /* keyboard shortcuts mean nothing on a touch screen */
+@media (max-width: 760px) {
+  .sub { position: static; margin: 2px 0 4px 10px; box-shadow: none; min-width: 0; }
+  .menu { min-width: min(240px, calc(100vw - 16px)); }
+}
 .step { width: auto; padding: 2px 8px; background: var(--panel2); border: 1px solid var(--line); justify-content: center; }
 </style>

@@ -29,7 +29,7 @@ watch(() => props.open, async (open) => {
 </script>
 
 <template>
-  <div v-if="open" class="backdrop" @mousedown.self="emit('close')">
+  <div v-if="open" class="backdrop" @pointerdown.self="emit('close')">
     <div ref="dialog" class="modal" role="dialog" aria-modal="true" :aria-label="title"
       :style="{ width: `min(${width}px, 100%)` }" @keydown="onKey">
       <h2>{{ title }}</h2>

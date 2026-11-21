@@ -14,14 +14,16 @@ import { ui, HEAD_W, saveHeadW } from '../stores/ui.js';
 import { takeSnapshot, commitUndo } from '../stores/history.js';
 import { transport, startTransport, currentBeat } from '../engine/transport.js';
 import { addClip, addSoundClip, addSongTrack, removeSongTrack, editPattern, PATTERN_MIME, SOUND_MIME, SONG_SNAPS, songGrid, snapSong, placeGrid, isFine, moveRow, moveRowBy,
-  choosePattern, setClipEdges, addSection, removeSection, sectionGap } from '../engine/song.js';
+  choosePattern, chooseSound, setClipEdges, addSection, removeSection, sectionGap } from '../engine/song.js';
 import { importSoundFiles, previewSound, soundPeaks, soundState } from '../engine/sounds.js';
 import { addAutomation, removeAutomation, setEffect, toggleTarget, setAutomationEnabled } from '../engine/automation.js';
 import { AUTOMATION_EFFECTS, EFFECT_KEYS } from '../audio/effects.js';
 import AutomationLane from './AutomationLane.vue';
 import { useFrameValue } from '../composables/useFrameValue.js';
+import { doubleTapper, recentlyDoubleTapped } from '../composables/touch.js';
+import { device } from '../stores/device.js';
 
-const HEAD = computed(() => ui.headW); // track header column width (px), resizable
+const HEAD = computed(() => (device.narrow ? Math.min(ui.headW, 132) : ui.headW)); // track header column width (px), resizable; narrower on phones
 const LANE_H = 56;  // row height (px)
 const AUTO_H = 72;  // automation row height (px)
 const RULER_H = 24, SECTIONS_H = 22;
@@ -136,7 +138,19 @@ async function onDrop(e, t) {
 }
 const onDragOver = (e) => { if ([...e.dataTransfer.types].some((ty) => DROP_TYPES.includes(ty))) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } };
 /** Double-click empty space: place the most recently selected pattern (picked in the list, or a clip of it clicked here). */
-const onLaneDblClick = (e, t) => addClip(t.id, project.curPattern, beatAt(e, e.currentTarget), { fine: isFine(e) });
+function onLaneDblClick(e, t) {
+  const at = beatAt(e, e.currentTarget), fine = { fine: isFine(e) };
+  if (ui.placeSound != null && soundById(ui.placeSound)) addSoundClip(t.id, ui.placeSound, at, fine);
+  else addClip(t.id, project.curPattern, at, fine);
+}
+const onNativeLaneDblClick = (e, t) => { if (!recentlyDoubleTapped()) onLaneDblClick(e, t); };
+/* touch: a tap is a pointerup the browser didn't turn into a scroll (that sends pointercancel instead) */
+const dtap = doubleTapper();
+function onLaneUp(e, t) {
+  if (e.pointerType === 'touch' && e.target === e.currentTarget && dtap(e, `lane${t.id}`)) onLaneDblClick(e, t);
+}
+/** Song view zoom (also Ctrl+wheel). */
+const zoom = (f) => { ui.barPx = clamp(ui.barPx * f, 24, 320); };
 
 /* ---- moving clips ---- */
 const drag = ref(null);
@@ -150,7 +164,8 @@ function onClipDown(e, c) {
     return;
   }
   if (!ui.songSel.has(c.id)) ui.songSel = new Set([c.id]);
-  if (!isSound(c)) choosePattern(c.patternId, { quiet: true }); // double-clicking empty space now places this pattern
+  if (isSound(c)) chooseSound(c.soundId, { quiet: true });
+  else choosePattern(c.patternId, { quiet: true }); // double-clicking empty space now places this pattern
   const tracks = orderedTracks();
   const laneIdx = (id) => tracks.findIndex((t) => t.id === id);
   const anchorRow = rows.value.findIndex((r) => r.kind === 'track' && r.item.id === c.trackId);
@@ -160,6 +175,7 @@ function onClipDown(e, c) {
     moved: false, copy: e.altKey, snap: takeSnapshot(), tracks,
     anchorLane: laneIdx(c.trackId), lastLane: laneIdx(c.trackId),
     anchorY: rowTops.value[anchorRow] + LANE_H / 2, // centre of the grabbed clip's row
+    clip: c, touch: e.pointerType === 'touch',
     orig: song.value.clips.filter((x) => ui.songSel.has(x.id)).map((x) => ({ id: x.id, start: x.start, lane: laneIdx(x.trackId) })),
   };
   // Follow the pointer on the window: moving a clip to another track re-creates its element,
@@ -206,8 +222,10 @@ function applyClipMove(e) {
     clip.trackId = d.tracks[o.lane + dLane].id;
   }
 }
-function onClipUp() {
+function onClipUp(e) {
+  const d = drag.value;
   drag.value = null;
+  if (d?.touch && !d.moved && e?.type === 'pointerup' && dtap(e, `clip${d.clip.id}`)) openClip(d.clip); // double-tap
   autoScroll.stop();
   window.removeEventListener('pointermove', onClipMove);
   window.removeEventListener('pointerup', onClipUp);
@@ -249,6 +267,7 @@ function gridPoint(e) {
 }
 function onLaneDown(e) {
   if (e.button !== 0) return;
+  if (e.pointerType === 'touch') { ui.songSel.clear(); return; } // a finger scrolls the song; box selection is for mouse and pen
   const { x, y } = gridPoint(e);
   const base = e.shiftKey ? new Set(ui.songSel) : new Set();
   ui.songSel = new Set(base);
@@ -565,6 +584,38 @@ let optSnap = null;
 const optStart = () => { if (!optSnap) optSnap = takeSnapshot(); };
 const optCommit = () => { if (optSnap) commitUndo(optSnap); optSnap = null; };
 
+/* ---- phones: a row's actions (mute, solo, colour, move, delete) live in its ⋯ menu ---- */
+/** Open the colour picker of a row (its swatch input is visually hidden on phones). */
+function pickColor(r) {
+  const el = document.querySelector(`[data-row="${r.key}"] input[type=color]`);
+  if (!el) return;
+  try { if (el.showPicker) { el.showPicker(); return; } } catch { /* not allowed here: fall back to a click */ }
+  el.click();
+}
+function rowActions(r, i) {
+  const t = r.item, track = r.kind === 'track';
+  const check = (on, label) => (on ? `✓ ${label}` : label);
+  return [
+    { header: t.name },
+    ...(track ? [
+      { label: () => check(t.mute, 'Mute'), run: () => { t.mute = !t.mute; } },
+      { label: () => check(t.solo, 'Solo'), run: () => { t.solo = !t.solo; } },
+    ] : [
+      { label: () => (t.enabled !== false ? 'Switch off (keeps its curve)' : 'Switch on'), run: () => setAutomationEnabled(t, t.enabled === false) },
+    ]),
+    { label: 'Change colour…', run: () => pickColor(r) },
+    null,
+    { label: 'Move up', run: () => moveRowBy(r.key, -1), enabled: () => i > 0 },
+    { label: 'Move down', run: () => moveRowBy(r.key, 1), enabled: () => i < rows.value.length - 1 },
+    null,
+    { label: track ? 'Delete track' : 'Delete automation track', run: () => (track ? onRemoveTrack(t) : onRemoveAutomation(t)) },
+  ];
+}
+function openRowActions(e, r, i) {
+  const b = e.currentTarget.getBoundingClientRect();
+  Object.assign(ui.ctxMenu, { open: true, kind: 'custom', items: rowActions(r, i), serial: ui.ctxMenu.serial + 1, x: b.left, y: b.bottom + 2 });
+}
+
 function onRemoveAutomation(a) {
   if (a.points.length && !confirm(`Delete "${a.name}" and its ${a.points.length} point${a.points.length === 1 ? '' : 's'}?`)) return;
   removeAutomation(a.id);
@@ -582,7 +633,11 @@ function onRemoveAutomation(a) {
               title="Drag to resize the track names column (double-click to reset)"
               @pointerdown="onResizeDown" @pointermove="onResizeMove" @pointerup="onResizeUp" @pointercancel="onResizeUp"
               @dblclick="ui.headW = HEAD_W.def; saveHeadW()" @keydown="onResizeKey"></div>
-            <span>Tracks</span>
+            <span class="corner-title">Tracks</span>
+            <span class="zoom" role="group" aria-label="Zoom">
+              <button class="small" title="Zoom out (Ctrl+wheel)" aria-label="Zoom out" @click="zoom(1 / 1.25)">−</button>
+              <button class="small" title="Zoom in (Ctrl+wheel)" aria-label="Zoom in" @click="zoom(1.25)">+</button>
+            </span>
             <label class="snap" title="Where clips can be placed">Snap
               <select v-model="ui.songSnap" aria-label="Song snap">
                 <option v-for="o in SONG_SNAPS" :key="o.label" :value="o.value">{{ o.label }}</option>
@@ -619,19 +674,22 @@ function onRemoveAutomation(a) {
                 @pointerdown="onGripDown($event, r, i)" @pointermove="onGripMove" @pointerup="onGripUp" @pointercancel="onGripUp" @keydown="onGripKey($event, r)">⠿</button>
               <input v-model="r.item.color" type="color" class="swatch" :aria-label="`Colour of ${r.item.name}`" title="Track colour">
               <input v-model="r.item.name" class="name" :title="r.item.name" :aria-label="`Name of ${r.item.name}`">
-              <button class="small" :class="{ on: r.item.mute }" title="Mute track" @click="r.item.mute = !r.item.mute">M</button>
-              <button class="small" :class="{ on: r.item.solo }" title="Solo track" @click="r.item.solo = !r.item.solo">S</button>
-              <button class="small del" title="Delete track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveTrack(r.item)">✕</button>
+              <span v-if="r.item.mute" class="badge" title="Muted">M</span>
+              <span v-if="r.item.solo" class="badge" title="Solo">S</span>
+              <button class="small actions" :aria-label="`Actions for ${r.item.name}`" title="Mute, solo, colour, move, delete" @click="openRowActions($event, r, i)">⋯</button>
+              <button class="small inline" :class="{ on: r.item.mute }" title="Mute track" @click="r.item.mute = !r.item.mute">M</button>
+              <button class="small inline" :class="{ on: r.item.solo }" title="Solo track" @click="r.item.solo = !r.item.solo">S</button>
+              <button class="small del inline" title="Delete track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveTrack(r.item)">✕</button>
             </div>
             <div class="lane" :class="{ muted: r.item.mute }" :style="laneBg"
-              @dragover="onDragOver" @drop.prevent="onDrop($event, r.item)" @dblclick.self="onLaneDblClick($event, r.item)"
+              @dragover="onDragOver" @drop.prevent="onDrop($event, r.item)" @dblclick.self="onNativeLaneDblClick($event, r.item)" @pointerup.self="onLaneUp($event, r.item)"
               @contextmenu.self="onLaneContext($event, r.item)"
               @pointerdown.self="onLaneDown">
               <div v-for="c in clipsOf(r.item)" :key="c.id" class="clip" :class="{ sel: ui.songSel.has(c.id), sound: isSound(c), missing: isSound(c) && soundState.missing[c.soundId], 'cut-start': cutStart(c), 'cut-end': cutEnd(c) }" :style="clipStyle(c, r.item)"
                 role="button" tabindex="0" :aria-label="`${isSound(c) ? 'Sound' : 'Pattern'} ${clipName(c)} at ${formatPosition(c.start, project.timeSig)}`"
                 :title="`${clipName(c)} at ${formatPosition(c.start, project.timeSig)} — ${clipHint(c)}, drag to move (Ctrl for fine adjustment, Alt copies), drag an edge to truncate, ←/→ nudge (Ctrl+←/→ fine)`"
                 @pointerdown="onClipDown($event, c)"
-                @dblclick.stop="openClip(c)" @contextmenu="onClipContext($event, c)" @keydown="onClipKey($event, c)">
+                @dblclick.stop="!recentlyDoubleTapped() && openClip(c)" @contextmenu="onClipContext($event, c)" @keydown="onClipKey($event, c)">
                 <span class="clip-name">{{ isSound(c) ? '♪ ' : '' }}{{ clipName(c) }}</span>
                 <svg v-if="isSound(c) && waves.get(c.soundId)" class="preview wave" :viewBox="previewBox(c)" preserveAspectRatio="none">
                   <path :d="waves.get(c.soundId).d" />
@@ -652,10 +710,12 @@ function onRemoveAutomation(a) {
                   @pointerdown="onGripDown($event, r, i)" @pointermove="onGripMove" @pointerup="onGripUp" @pointercancel="onGripUp" @keydown="onGripKey($event, r)">⠿</button>
                 <input v-model="r.item.color" type="color" class="swatch" :aria-label="`Colour of ${r.item.name}`" title="Automation colour">
                 <input v-model="r.item.name" class="name" :title="r.item.name" :aria-label="`Name of ${r.item.name}`">
-                <button class="small onoff" :class="{ on: r.item.enabled !== false }" :aria-pressed="r.item.enabled !== false"
+                <span v-if="r.item.enabled === false" class="badge" title="Switched off">Off</span>
+                <button class="small actions" :aria-label="`Actions for ${r.item.name}`" title="On/off, colour, move, delete" @click="openRowActions($event, r, i)">⋯</button>
+                <button class="small onoff inline" :class="{ on: r.item.enabled !== false }" :aria-pressed="r.item.enabled !== false"
                   :title="r.item.enabled !== false ? 'Switch this automation off (keeps its curve)' : 'Switch this automation on'"
                   @click="setAutomationEnabled(r.item, r.item.enabled === false)">{{ r.item.enabled !== false ? 'On' : 'Off' }}</button>
-                <button class="small del" title="Delete automation track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveAutomation(r.item)">✕</button>
+                <button class="small del inline" title="Delete automation track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveAutomation(r.item)">✕</button>
               </div>
               <div class="line">
                 <select :value="r.item.effect" :aria-label="`Effect of ${r.item.name}`" title="The effect this automation controls" @change="setEffect(r.item, $event.target.value)">
@@ -767,6 +827,9 @@ function onRemoveAutomation(a) {
 .lane-row.dragging { opacity: .5; }
 .drop-line { position: absolute; left: 0; right: 0; height: 3px; margin-top: -1px; background: var(--accent); z-index: 7; pointer-events: none; box-shadow: 0 0 6px var(--accent); }
 .onoff { min-width: 34px; }
+.head .actions, .head .badge { display: none; }
+.head .actions { flex: none; min-width: 28px; padding: 0 6px; font-weight: 700; }
+.badge { flex: none; padding: 0 4px; border-radius: 3px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 16px; }
 .auto-row.disabled .lane { opacity: .35; }
 .auto-row.disabled .auto-head .name { text-decoration: line-through; color: var(--dim); }
 .add-row { display: flex; align-items: flex-start; }
@@ -799,5 +862,27 @@ function onRemoveAutomation(a) {
 .sec-edge.end { right: 0; }
 .sec-edge:hover { background: color-mix(in srgb, var(--strong) 30%, transparent); }
 .marquee { position: absolute; z-index: 1; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 2px; }
+.zoom { display: inline-flex; gap: 2px; text-transform: none; letter-spacing: 0; }
+.zoom button { padding: 0 6px; line-height: 1.2; }
+@media (max-width: 760px) {
+  .corner-title, .snap > :not(select) { display: none; }
+  .snap { font-size: 0; } /* just the select */
+  .corner { padding: 0 4px; gap: 3px; }
+  .head { gap: 2px; padding: 0 3px; }
+  /* the colour shows on the left edge; the picker opens from the ⋯ menu */
+  .head .swatch { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .head .inline { display: none; } /* mute / solo / on-off / delete: in the ⋯ menu */
+  .head .actions { display: inline-block; }
+  .head .badge { display: inline-block; }
+  .add-row .help { display: none; }
+}
+@media (pointer: coarse) {
+  .trim { width: 16px; max-width: 34%; }
+  .sec-edge { width: 14px; }
+  .head .del, .sec-del { opacity: .6; } /* no hover on a touch screen */
+  .clip { -webkit-touch-callout: none; }
+  .corner button, .corner select { min-height: 0; } /* the header rows have fixed heights (positions depend on them) */
+  .zoom button { min-width: 26px; }
+}
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); pointer-events: none; z-index: 1; opacity: .85; }
 </style>

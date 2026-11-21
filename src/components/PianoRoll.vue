@@ -40,15 +40,17 @@ function frame() {
   }
 }
 
-const onMove = (e) => handlers.onMouseMove(e);
-const onUp = (e) => handlers.onMouseUp(e);
+const onMove = (e) => handlers.onPointerMove(e);
+const onUp = (e) => handlers.onPointerUp(e);
+const onCancel = (e) => handlers.onPointerCancel(e);
 
 onMounted(() => {
   g = canvas.value.getContext('2d');
   handlers = createRollInteraction(canvas.value);
   canvas.value.addEventListener('wheel', handlers.onWheel, { passive: false });
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
   ro = new ResizeObserver(resize);
   ro.observe(wrap.value);
   resize();
@@ -57,18 +59,19 @@ onMounted(() => {
 onUnmounted(() => {
   ro?.disconnect();
   offFrame?.();
-  window.removeEventListener('mousemove', onMove);
-  window.removeEventListener('mouseup', onUp);
+  window.removeEventListener('pointermove', onMove);
+  window.removeEventListener('pointerup', onUp);
+  window.removeEventListener('pointercancel', onCancel);
 });
 </script>
 
 <template>
   <div class="center">
     <div ref="wrap" class="roll-wrap">
-      <canvas ref="canvas"
-        @mousedown="handlers.onMouseDown"
-        @dblclick="handlers.onDblClick"
-        @contextmenu="handlers.onContextMenu"></canvas>
+      <canvas ref="canvas" data-own-touch
+        @pointerdown="handlers.onPointerDown"
+        @dblclick="handlers.onNativeDblClick"
+        @contextmenu="handlers.onNativeContextMenu"></canvas>
       <RecOverlay />
       <PickOverlay />
     </div>
@@ -78,5 +81,5 @@ onUnmounted(() => {
 <style scoped>
 .center { position: relative; min-width: 0; min-height: 0; }
 .roll-wrap { position: absolute; inset: 0; }
-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 </style>

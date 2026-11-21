@@ -119,14 +119,7 @@ export function pickKeyDown(e) {
   const drumMode = isDrum(curTrack());
   const isPad = drumMode ? code !== 'Space' && padPitch(code) != null : code in PIANO_KEYS;
   if (isPad && !e.ctrlKey && !e.metaKey) {
-    if (!n) return;
-    cancelHold(); // latest key wins
-    setPitch(n, drumMode ? padPitch(code) : pick.base + PIANO_KEYS[code]);
-    const ms = Math.max(100, +project.settings.holdMs || 750);
-    pick.hold = {
-      code, t0: performance.now(), ms,
-      timer: setTimeout(() => { if (pick.hold && pick.hold.code === code) pickConfirm(); }, ms),
-    };
+    startHold(code, drumMode ? padPitch(code) : pick.base + PIANO_KEYS[code]);
     return;
   }
   switch (e.key) {
@@ -150,6 +143,35 @@ export function pickKeyDown(e) {
 
 export function pickKeyUp(e) {
   if (pick.hold && pick.hold.code === e.code) cancelHold();
+}
+
+/** Set the current note to `pitch` and confirm it if held long enough (keyed by what's held: a key code, or a touch). */
+function startHold(code, pitch) {
+  const n = pickNote();
+  if (!n || pitch == null) return;
+  cancelHold(); // latest key wins
+  setPitch(n, pitch);
+  const ms = Math.max(100, +project.settings.holdMs || 750);
+  pick.hold = {
+    code, t0: performance.now(), ms,
+    timer: setTimeout(() => { if (pick.hold && pick.hold.code === code) pickConfirm(); }, ms),
+  };
+}
+/** Touch / mouse on the roll's keyboard strip: press a key (pitch) like a computer key; hold to confirm. */
+export const pickPitchDown = (pitch) => startHold('pointer', pitch);
+export function pickPitchUp() {
+  if (pick.hold && pick.hold.code === 'pointer') cancelHold();
+}
+/** On-screen pick-mode controls (phones have no keyboard). */
+export function pickOctave(d) {
+  if (isDrum(curTrack())) { cancelHold(); shiftDrumBank(d); }
+  else pick.base = clamp(pick.base + d * 12, 0, 108);
+  focusPick();
+}
+export function pickHearPhrase() {
+  const n = pickNote();
+  if (transport.playing) { stopTransport(); focusPick(); return; }
+  if (n) startTransport(Math.max(0, n.start - 4), { stopAt: n.start + n.dur, onStop: () => pick.active && focusPick() });
 }
 
 /** Losing window focus mid-hold must not confirm a note. */

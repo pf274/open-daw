@@ -24,6 +24,8 @@ import { applyMix } from './engine/mix.js';
 import { refreshSongMix } from './engine/transport.js';
 import { installPianoPreload } from './engine/samples.js';
 import { installTheme } from './stores/theme.js';
+import { installLongPress } from './composables/touch.js';
+import { device } from './stores/device.js';
 import { restoreSounds, pruneStoredSounds } from './engine/sounds.js';
 import './engine/recorder.js'; // registers the transport/mic recording hooks
 
@@ -31,6 +33,9 @@ installTheme();
 
 if (restoreSaved()) status('Restored your last session.');
 else resetProject();
+
+// phones: the sidebar drawer closes when switching views, and isn't left open on a wide screen
+watch(() => [ui.view, device.narrow], () => { ui.drawer = false; });
 
 // keep audio in sync with volume / mute / solo (every pattern's layers) and the master volume
 watch(() => project.patterns.map((p) => p.layers.map((t) => [t.id, t.vol, t.mute, t.solo])), () => { applyMix(); refreshSongMix(); }, { deep: true });
@@ -41,6 +46,7 @@ onMounted(() => {
   installAutosave();
   installPrefs();
   installKeyboard();
+  installLongPress();
   startFrameLoop();
   // decode imported sounds from browser storage, then drop stored audio no sound uses any more
   restoreSounds().then(pruneStoredSounds).catch(() => {});
@@ -50,7 +56,8 @@ onMounted(() => {
 <template>
   <AppHeader />
   <main v-if="ui.view === 'song'">
-    <aside>
+    <aside :class="{ open: ui.drawer }" aria-label="Patterns and sounds">
+      <button class="drawer-close" aria-label="Close the side panel" @click="ui.drawer = false">✕</button>
       <SidebarSection id="patterns" title="Patterns" :count="project.patterns.length"><PatternList /></SidebarSection>
       <SidebarSection id="sounds" title="Sounds" :count="project.sounds.length"><SoundList /></SidebarSection>
       <HelpPanel />
@@ -58,13 +65,15 @@ onMounted(() => {
     <SongView />
   </main>
   <main v-else>
-    <aside>
+    <aside :class="{ open: ui.drawer }" aria-label="Patterns and layers">
+      <button class="drawer-close" aria-label="Close the side panel" @click="ui.drawer = false">✕</button>
       <PatternBar />
       <TrackList />
       <HelpPanel />
     </aside>
     <PianoRoll />
   </main>
+  <div v-if="ui.drawer && device.narrow" class="drawer-backdrop" @click="ui.drawer = false"></div>
   <StatusBar />
   <ContextMenu />
   <TremorModal />
