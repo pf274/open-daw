@@ -26,7 +26,7 @@ import { applyMix } from './engine/mix.js';
 import { refreshSongMix } from './engine/transport.js';
 import { installPianoPreload } from './engine/samples.js';
 import { installTheme } from './stores/theme.js';
-import { installLongPress } from './composables/touch.js';
+import { installLongPress, installNoPageZoom } from './composables/touch.js';
 import { device } from './stores/device.js';
 import { restoreSounds, pruneStoredSounds } from './engine/sounds.js';
 import './engine/recorder.js'; // registers the transport/mic recording hooks
@@ -43,14 +43,15 @@ watch(() => [ui.view, device.narrow], () => { ui.drawer = false; });
 watch(() => project.patterns.map((p) => p.layers.map((t) => [t.id, t.vol, t.mute, t.solo])), () => { applyMix(); refreshSongMix(); }, { deep: true });
 watch(() => ui.masterVol, setMasterVolume, { immediate: true });
 
-let offLongPress = null;
-onUnmounted(() => offLongPress?.());
+let offLongPress = null, offNoZoom = null;
+onUnmounted(() => { offLongPress?.(); offNoZoom?.(); });
 onMounted(() => {
   installPianoPreload();
   installAutosave();
   installPrefs();
   installKeyboard();
   offLongPress = installLongPress();
+  offNoZoom = installNoPageZoom();
   startFrameLoop();
   // decode imported sounds from browser storage, then drop stored audio no sound uses any more
   restoreSounds().then(pruneStoredSounds).catch(() => {});

@@ -10,7 +10,7 @@ import { device } from '../stores/device.js';
       pinch to zoom, <b>double-tap</b> to add or delete a note, <b>double-tap and drag</b> to box-select, and <b>long-press</b> for the menu (copy, transpose, quantize…).
       While recording, <b>tap the roll</b> on each note. In pick mode, hold a key on the left keyboard to choose its pitch.<br>
       <b>Song:</b> tap a pattern or sound in this panel, then double-tap a track to place it. Drag clips to move them, drag their
-      edges to shorten them, double-tap and drag to box-select clips, long-press for the clip menu, and use − / + to zoom.
+      edges to shorten them, double-tap and drag to box-select clips, long-press for the clip menu, and pinch (or − / +) to zoom.
     </p>
     <p class="help">
       1. In <b>Settings → Input</b>, press <b>🎤 Mic</b> and whistle; the readout shows the detected note (● Rec turns the mic on by itself too).<br>

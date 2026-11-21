@@ -32,3 +32,19 @@ describe('installing as an app', () => {
     expect(html).toContain('<link rel="manifest" href="manifest.webmanifest">');
   });
 });
+
+describe('the page never zooms', () => {
+  it('cancels two-finger moves and iOS pinch gestures, not one-finger scrolling', async () => {
+    const { installNoPageZoom } = await import('../src/composables/touch.js');
+    const off = installNoPageZoom();
+    const move = (n) => { const e = new Event('touchmove', { cancelable: true }); e.touches = Array(n).fill({}); document.dispatchEvent(e); return e.defaultPrevented; };
+    expect(move(1)).toBe(false);
+    expect(move(2)).toBe(true);
+    const g = new Event('gesturestart', { cancelable: true });
+    document.dispatchEvent(g);
+    expect(g.defaultPrevented).toBe(true);
+    off();
+    expect(move(2)).toBe(false);
+    expect(readFileSync('index.html', 'utf8')).toContain('user-scalable=no');
+  });
+});

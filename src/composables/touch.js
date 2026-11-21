@@ -81,3 +81,21 @@ export function installLongPress(root = document) {
     root.removeEventListener('click', onClick, true);
   };
 }
+
+/**
+ * The page never zooms: pinching zooms the piano roll / song timeline instead (they handle their own
+ * fingers). CSS touch-action and the viewport tag cover most browsers; iOS Safari ignores both,
+ * so its pinch gestures and two-finger moves are cancelled here.
+ */
+export function installNoPageZoom(root = document) {
+  const stop = (e) => { if (e.cancelable) e.preventDefault(); };
+  const onTouchMove = (e) => { if (e.touches?.length > 1) stop(e); };
+  root.addEventListener('gesturestart', stop, { passive: false });
+  root.addEventListener('gesturechange', stop, { passive: false });
+  root.addEventListener('touchmove', onTouchMove, { passive: false });
+  return () => {
+    root.removeEventListener('gesturestart', stop);
+    root.removeEventListener('gesturechange', stop);
+    root.removeEventListener('touchmove', onTouchMove);
+  };
+}

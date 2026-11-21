@@ -8,7 +8,7 @@
  */
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
 import { clamp } from '../core/music.js';
-import { project, patternById, patternLength, songLength, nid, barLen, beatLen, songRows, orderedTracks, soundById, clipLength, clipTrim, fullClipLength, MIN_CLIP, sortedSections } from '../stores/project.js';
+import { project, patternById, patternLength, songLength, nid, barLen, beatLen, songRows, orderedTracks, soundById, clipLength, clipTrim, fullClipLength, MIN_CLIP, sortedSections, songTrackAudible } from '../stores/project.js';
 import { snapRound, snapFloor, formatPosition } from '../core/meter.js';
 import { ui, HEAD_W, saveHeadW, toggleHeadCollapsed } from '../stores/ui.js';
 import { takeSnapshot, commitUndo } from '../stores/history.js';
@@ -565,6 +565,35 @@ watch(playhead, (b) => { // keep the playhead on screen while playing
   const x = HEAD.value + b * beatPx.value;
   if (x > el.scrollLeft + el.clientWidth - 40) el.scrollLeft = x - HEAD.value - 40;
 });
+/* ---- two-finger pinch zooms the timeline (the page itself doesn't zoom), keeping the bar between the fingers under them; the fingers also scroll ---- */
+let pinch = null; // { spread, barPx, beat, offX, top, midY }
+const PINCH_MIN = 20; // px: closer fingers count as this far apart
+function fingers(e) {
+  const [a, b] = e.touches;
+  return { mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2, spread: Math.max(PINCH_MIN, Math.abs(a.clientX - b.clientX)) };
+}
+function onPinchStart(e) {
+  const el = scroller.value;
+  if (e.touches?.length !== 2 || !el) return;
+  // a second finger ends whatever the first one started (anything already moved stays moved)
+  onClipUp(); onMarqueeUp(); onTrimUp(); onSecUp();
+  const f = fingers(e), offX = f.mx - el.getBoundingClientRect().left;
+  pinch = { spread: f.spread, barPx: ui.barPx, beat: (el.scrollLeft + offX - HEAD.value) / beatPx.value, offX, top: el.scrollTop, midY: f.my };
+}
+function onPinchMove(e) {
+  const el = scroller.value;
+  if (!pinch || e.touches?.length !== 2 || !el) return;
+  if (e.cancelable) e.preventDefault(); // we scroll and zoom ourselves
+  const f = fingers(e), p = pinch;
+  ui.barPx = clamp(p.barPx * (f.spread / p.spread), 24, 320); // fingers apart = zoom in
+  const offX = f.mx - el.getBoundingClientRect().left;
+  nextTick(() => { // once the grid has its new width
+    el.scrollLeft = HEAD.value + p.beat * beatPx.value - offX;
+    el.scrollTop = p.top - (f.my - p.midY);
+  });
+}
+function onPinchEnd(e) { if (!(e.touches?.length >= 2)) pinch = null; }
+
 function onWheel(e) {
   if (!e.ctrlKey) return;
   e.preventDefault();
@@ -678,7 +707,8 @@ function onRemoveAutomation(a) {
 
 <template>
   <div class="song-view" :class="{ collapsed: ui.headCollapsed }" :style="{ '--head-w': HEAD + 'px' }" @wheel="onWheel">
-    <div ref="scroller" class="scroller" @pointerdown.self="ui.songSel.clear()">
+    <div ref="scroller" class="scroller" @pointerdown.self="ui.songSel.clear()"
+      @touchstart.capture="onPinchStart" @touchmove.capture="onPinchMove" @touchend.capture="onPinchEnd" @touchcancel.capture="onPinchEnd">
       <div ref="gridEl" class="grid" :style="{ width: width + 'px' }">
         <div class="ruler-row">
           <div class="corner">
@@ -727,7 +757,7 @@ function onRemoveAutomation(a) {
         <template v-for="(r, i) in rows" :key="r.key">
           <div v-if="r.kind === 'track'" :data-row="r.key" class="lane-row" :class="{ dragging: rowDrag?.key === r.key }" :style="{ height: LANE_H + 'px' }">
             <div class="head" :style="{ borderLeftColor: r.item.color }">
-              <button v-if="ui.headCollapsed" class="strip" :style="{ background: r.item.color }" :class="{ off: r.item.mute }"
+              <button v-if="ui.headCollapsed" class="strip" :style="{ background: r.item.color }" :class="{ off: !songTrackAudible(r.item) }"
                 :title="`${r.item.name}${r.item.mute ? ' (muted)' : ''}${r.item.solo ? ' (solo)' : ''} — tap for actions`" :aria-label="`Actions for ${r.item.name}`"
                 @click="openRowActions($event, r, i)"></button>
               <button class="grip" :aria-label="`Move ${r.item.name} (drag, or ↑/↓)`" title="Drag to move this row (or focus and press ↑/↓)"
@@ -741,7 +771,7 @@ function onRemoveAutomation(a) {
               <button class="small inline" :class="{ on: r.item.solo }" title="Solo track" @click="r.item.solo = !r.item.solo">S</button>
               <button class="small del inline" title="Delete track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveTrack(r.item)">✕</button>
             </div>
-            <div class="lane" :class="{ muted: r.item.mute }" :style="laneBg"
+            <div class="lane" :class="{ muted: !songTrackAudible(r.item) }" :style="laneBg"
               @dragover="onDragOver" @drop.prevent="onDrop($event, r.item)" @dblclick.self="onNativeLaneDblClick($event, r.item)" @pointerup.self="onLaneUp($event, r.item)"
               @contextmenu.self="onLaneContext($event, r.item)"
               @pointerdown.self="onLaneDown($event, r.item)" @touchstart.self="onLaneTouchStart">
@@ -869,7 +899,7 @@ function onRemoveAutomation(a) {
 .name { flex: 1; min-width: 0; }
 .lane { position: relative; flex: 1; border-bottom: 1px solid var(--line);
   background-image: linear-gradient(to right, var(--line) 1px, transparent 1px); background-color: var(--bg); }
-.lane.muted { opacity: .45; }
+.lane.muted { opacity: .45; } /* muted, or another track is soloed */
 .clip { position: absolute; top: 4px; bottom: 4px; border-radius: 5px; overflow: hidden; cursor: grab; touch-action: none;
   color: rgb(var(--ink)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); user-select: none; }
 .clip:active { cursor: grabbing; }

@@ -267,6 +267,46 @@ describe('phone layout and the Song view by touch', () => {
     expect(w.find('.marquee').exists()).toBe(false);
   });
 
+  it('two fingers pinch the song timeline to zoom it, keeping the bar between them in place', async () => {
+    ui.barPx = 72;
+    await flushPromises();
+    const sc = w.find('.scroller');
+    sc.element.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 600, right: 400, bottom: 600 });
+    const head = parseFloat(w.find('.song-view').attributes('style').match(/--head-w: ([\d.]+)px/)[1]);
+    const t = (x) => ({ clientX: x, clientY: 200 });
+    const fire = (type, pts) => {
+      const e = new Event(type, { bubbles: true, cancelable: true });
+      e.touches = pts.map(t);
+      sc.element.dispatchEvent(e);
+      return e;
+    };
+    // fingers 100 px apart around x = head + 2 bars (beat 8)
+    const mid = head + 72 * 2;
+    fire('touchstart', [mid - 50, mid + 50]);
+    const mv = fire('touchmove', [mid - 100, mid + 100]); // twice as far apart
+    expect(mv.defaultPrevented).toBe(true); // no native scroll / page zoom
+    expect(ui.barPx).toBeCloseTo(144);
+    await flushPromises();
+    expect(sc.element.scrollLeft).toBeCloseTo(head + 144 * 2 - mid, 0); // beat 8 stays between the fingers
+    fire('touchend', [mid - 100]);
+    const one = fire('touchmove', [mid]);
+    expect(one.defaultPrevented).toBe(false); // one finger: the browser scrolls
+    expect(ui.barPx).toBeCloseTo(144);
+    ui.barPx = 72;
+  });
+
+  it('soloing a track fades the others, like muting them', async () => {
+    const lanes = () => w.findAll('.lane').slice(0, 2).map((l) => l.classes().includes('muted'));
+    expect(lanes()).toEqual([false, false]);
+    project.song.tracks[0].solo = true;
+    await flushPromises();
+    expect(lanes()).toEqual([false, true]);
+    project.song.tracks[0].solo = false;
+    project.song.tracks[1].mute = true;
+    await flushPromises();
+    expect(lanes()).toEqual([false, true]);
+  });
+
   it('on a phone, each track row has a ⋯ menu: mute, solo, colour, move, delete (and on/off for automation)', async () => {
     const { addAutomation } = await import('../src/engine/automation.js');
     addAutomation();

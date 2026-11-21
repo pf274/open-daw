@@ -1,6 +1,6 @@
 <script setup>
 import { INSTRUMENTS } from '../audio/instruments.js';
-import { project, isDrum } from '../stores/project.js';
+import { project, isDrum, audible } from '../stores/project.js';
 import { viewDrums } from '../stores/view.js';
 import { audition } from '../engine/mix.js';
 import { setInstrument, openSynthEditor } from '../engine/synthEditor.js';
@@ -27,12 +27,12 @@ function onInstrument(e) {
 </script>
 
 <template>
-  <div class="track" :class="{ sel: selected }" @pointerdown="$emit('select')">
+  <div class="track" :class="{ sel: selected, silent: !audible(track) }" @pointerdown="$emit('select')">
     <div class="row">
       <span class="dot" :style="{ background: track.color }"></span>
       <input v-model="track.name" class="name">
-      <button class="small" :class="{ on: track.mute }" title="Mute" @click="track.mute = !track.mute">M</button>
-      <button class="small" :class="{ on: track.solo }" title="Solo" @click="track.solo = !track.solo">S</button>
+      <button class="small mute-solo" :class="{ on: track.mute }" title="Mute" @click="track.mute = !track.mute">M</button>
+      <button class="small mute-solo" :class="{ on: track.solo }" title="Solo" @click="track.solo = !track.solo">S</button>
       <button class="small" title="Delete layer" @click.stop="$emit('remove')">✕</button>
     </div>
     <div class="row">
@@ -51,6 +51,7 @@ function onInstrument(e) {
 
 <style scoped>
 .track { border: 1px solid var(--line); border-radius: 6px; padding: 6px; margin-bottom: 6px; background: var(--panel2); cursor: pointer; }
+.track.silent > .row > :not(.mute-solo) { opacity: .45; } /* muted, or another layer is soloed (M / S stay clear) */
 .track.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .row { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
 .row:first-child { margin-top: 0; }
