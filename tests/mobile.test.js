@@ -68,6 +68,31 @@ describe('piano roll with a finger', () => {
     expect(curTrack().notes.map((n) => n.pitch)).toEqual([60]);
   });
 
+  it('double-tap and drag on empty space box-selects (a plain drag still pans; lifting without a drag still adds a note)', () => {
+    curTrack().notes.push({ id: 7002, start: 6, dur: 1, pitch: 62, vel: 90 }, { id: 7003, start: 9, dur: 1, pitch: 50, vel: 90 });
+    const [x, y] = at(4.5, 66), [x2, y2] = at(7.5, 61);
+    const scroll = ui.scrollX;
+    tap(x, y);
+    r.onPointerDown(touch(x, y));
+    r.onPointerMove(touch(x2, y2));
+    expect(view.drag?.mode).toBe('box');
+    r.onPointerUp(touch(x2, y2));
+    expect([...ui.sel].sort()).toEqual([7001, 7002]);
+    expect(ui.scrollX).toBe(scroll); // no pan
+    expect(view.drag).toBe(null);
+    expect(curTrack().notes).toHaveLength(3); // no note added
+    // the next tap starts afresh: it's not the second half of a double-tap
+    vi.advanceTimersByTime(10);
+    tap(x2, y2);
+    expect(curTrack().notes).toHaveLength(3);
+    // a second press that never drags is still a double-tap
+    vi.advanceTimersByTime(1000);
+    const [ax, ay] = at(11, 60);
+    tap(ax, ay);
+    tap(ax, ay);
+    expect(curTrack().notes).toHaveLength(4);
+  });
+
   it('a finger drags a note (with a wider resize edge), and a small wobble is still a tap', () => {
     const [x, y] = at(5.4, 64);
     r.onPointerDown(touch(x, y));
@@ -202,6 +227,44 @@ describe('phone layout and the Song view by touch', () => {
     expect(project.song.clips.at(-1)).toMatchObject({ trackId: project.song.tracks[1].id, start: 8 });
     await lane.trigger('dblclick', { clientX: 72 * 2 }); // the browser's own dblclick right after: ignored
     expect(project.song.clips).toHaveLength(n + 1);
+  });
+
+  it('double-tap and drag on a track box-selects clips; a plain press scrolls (no box)', async () => {
+    ui.barPx = 72;
+    await flushPromises();
+    const lane = w.findAll('.lane')[0];
+    project.song.clips.splice(0, project.song.clips.length,
+      { id: 9101, trackId: project.song.tracks[0].id, patternId: project.curPattern, start: 4 },
+      { id: 9102, trackId: project.song.tracks[0].id, patternId: project.curPattern, start: 16 });
+    await flushPromises();
+    const down = (x, y) => lane.trigger('pointerdown', { pointerType: 'touch', button: 0, clientX: x, clientY: y });
+    const ev = (type, x, y) => window.dispatchEvent(Object.assign(new Event(type), { pointerType: 'touch', clientX: x, clientY: y }));
+    const head = parseFloat(w.find('.song-view').attributes('style').match(/--head-w: ([\d.]+)px/)[1]);
+    const rowY = 60 + 20, x0 = head + 72 * 0.2;
+    // a single press: no box, the song scrolls natively
+    await down(x0, rowY);
+    const ts = new Event('touchstart', { cancelable: true });
+    lane.element.dispatchEvent(ts);
+    expect(ts.defaultPrevented).toBe(false);
+    ev('pointermove', x0 + 200, rowY);
+    expect(w.find('.marquee').exists()).toBe(false);
+    ev('pointercancel', x0 + 200, rowY);
+    // tap, then press and drag
+    await lane.trigger('pointerup', { pointerType: 'touch', clientX: x0, clientY: rowY });
+    await down(x0, rowY);
+    const ts2 = new Event('touchstart', { cancelable: true });
+    lane.element.dispatchEvent(ts2);
+    expect(ts2.defaultPrevented).toBe(true); // no scrolling during the box
+    ev('pointermove', head + 72 * 2, rowY + 10);
+    await flushPromises();
+    expect(w.find('.marquee').exists()).toBe(true);
+    const n = project.song.clips.length;
+    await lane.trigger('pointerup', { pointerType: 'touch', clientX: head + 72 * 2, clientY: rowY + 10 });
+    ev('pointerup', head + 72 * 2, rowY + 10);
+    await flushPromises();
+    expect([...ui.songSel]).toEqual([9101]);
+    expect(project.song.clips).toHaveLength(n); // nothing placed
+    expect(w.find('.marquee').exists()).toBe(false);
   });
 
   it('on a phone, each track row has a ⋯ menu: mute, solo, colour, move, delete (and on/off for automation)', async () => {

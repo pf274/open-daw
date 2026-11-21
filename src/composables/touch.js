@@ -8,16 +8,24 @@
 const TAP_MS = 350, TAP_PX = 24;
 let lastFired = -Infinity;
 
-/** A double-tap detector: call it on each tap (pointerup without movement); true on the second tap of a pair. `key` = what was tapped. */
+/**
+ * A double-tap detector: call it on each tap (pointerup without movement); true on the second tap of a pair. `key` = what was tapped.
+ * `.pending(e, key)` asks, on a pointerdown, whether this press is the second of a pair (without using up the first tap):
+ * that is how double-tap-and-drag (box selection) is told apart from a plain drag. `.reset()` forgets the first tap.
+ */
 export function doubleTapper() {
   let last = null;
-  return (e, key = '') => {
+  const near = (e, key, now) => !!last && last.key === key && now - last.t < TAP_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) < TAP_PX;
+  const tap = (e, key = '') => {
     const now = performance.now();
-    const hit = !!last && last.key === key && now - last.t < TAP_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) < TAP_PX;
+    const hit = near(e, key, now);
     last = hit ? null : { t: now, x: e.clientX, y: e.clientY, key };
     if (hit) lastFired = now;
     return hit;
   };
+  tap.pending = (e, key = '') => near(e, key, performance.now());
+  tap.reset = () => { last = null; };
+  return tap;
 }
 /** True just after a touch double-tap was handled: skip the native dblclick that may follow. */
 export const recentlyDoubleTapped = () => performance.now() - lastFired < 700;

@@ -149,7 +149,9 @@ const onNativeLaneDblClick = (e, t) => { if (!recentlyDoubleTapped()) onLaneDblC
 /* touch: a tap is a pointerup the browser didn't turn into a scroll (that sends pointercancel instead) */
 const dtap = doubleTapper();
 function onLaneUp(e, t) {
-  if (e.pointerType === 'touch' && e.target === e.currentTarget && dtap(e, `lane${t.id}`)) onLaneDblClick(e, t);
+  if (e.pointerType !== 'touch' || e.target !== e.currentTarget) return;
+  if (marquee.value?.active) { dtap.reset(); return; } // the end of a double-tap-and-drag box selection, not a tap
+  if (dtap(e, `lane${t.id}`)) onLaneDblClick(e, t);
 }
 /** Song view zoom (also Ctrl+wheel). */
 const zoom = (f) => { ui.barPx = clamp(ui.barPx * f, 24, 320); };
@@ -261,24 +263,28 @@ onUnmounted(onClipUp);
 
 /* ---- box selection: drag on empty track space to select every clip the box touches (Shift adds) ---- */
 const gridEl = ref(null);
-const marquee = ref(null); // { x0, y0, x1, y1 (grid px), base: Set, active, last }
+const marquee = ref(null); // { x0, y0, x1, y1 (grid px), base: Set, active, last, touch }
 /** Pointer position in grid coordinates (the grid scrolls with the content, so this counts scrolling). */
 function gridPoint(e) {
   const r = gridEl.value?.getBoundingClientRect() ?? { left: 0, top: 0 };
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
-function onLaneDown(e) {
+function onLaneDown(e, t) {
   if (e.button !== 0) return;
-  if (e.pointerType === 'touch') { ui.songSel.clear(); return; } // a finger scrolls the song; box selection is for mouse and pen
+  const touch = e.pointerType === 'touch';
+  // a finger scrolls the song; tap, then press again and drag to box-select (onLaneTouchStart stops the scroll)
+  if (touch && !dtap.pending(e, `lane${t.id}`)) { ui.songSel.clear(); return; }
   const { x, y } = gridPoint(e);
   const base = e.shiftKey ? new Set(ui.songSel) : new Set();
   ui.songSel = new Set(base);
   ui.autoSel = null;
-  marquee.value = { x0: x, y0: y, x1: x, y1: y, base, active: false, last: null };
+  marquee.value = { x0: x, y0: y, x1: x, y1: y, base, active: false, last: null, touch };
   window.addEventListener('pointermove', onMarqueeMove);
   window.addEventListener('pointerup', onMarqueeUp);
   window.addEventListener('pointercancel', onMarqueeUp);
 }
+/** A touch box selection is starting: keep the browser from scrolling the song instead (touchstart follows pointerdown). */
+const onLaneTouchStart = (e) => { if (marquee.value?.touch && e.cancelable) e.preventDefault(); };
 function onMarqueeMove(e) {
   const m = marquee.value;
   if (!m) return;
@@ -738,7 +744,7 @@ function onRemoveAutomation(a) {
             <div class="lane" :class="{ muted: r.item.mute }" :style="laneBg"
               @dragover="onDragOver" @drop.prevent="onDrop($event, r.item)" @dblclick.self="onNativeLaneDblClick($event, r.item)" @pointerup.self="onLaneUp($event, r.item)"
               @contextmenu.self="onLaneContext($event, r.item)"
-              @pointerdown.self="onLaneDown">
+              @pointerdown.self="onLaneDown($event, r.item)" @touchstart.self="onLaneTouchStart">
               <div v-for="c in clipsOf(r.item)" :key="c.id" class="clip" :class="{ sel: ui.songSel.has(c.id), sound: isSound(c), missing: isSound(c) && soundState.missing[c.soundId], 'cut-start': cutStart(c), 'cut-end': cutEnd(c) }" :style="clipStyle(c, r.item)"
                 role="button" tabindex="0" :aria-label="`${isSound(c) ? 'Sound' : 'Pattern'} ${clipName(c)} at ${formatPosition(c.start, project.timeSig)}`"
                 :title="`${clipName(c)} at ${formatPosition(c.start, project.timeSig)} — ${clipHint(c)}, drag to move (Ctrl for fine adjustment, Alt copies), drag an edge to truncate, ←/→ nudge (Ctrl+←/→ fine)`"

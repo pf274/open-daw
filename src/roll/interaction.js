@@ -3,7 +3,7 @@
  * ruler seek + loop, wheel scroll/zoom, context menu.
  *
  * Touch (onPointer*): a finger on a note moves/resizes it like the mouse; on empty space it pans;
- * two fingers pan and pinch-zoom; double-tap adds/deletes; long-press opens the menu; while
+ * two fingers pan and pinch-zoom; double-tap adds/deletes; double-tap-and-drag on empty space box-selects; long-press opens the menu; while
  * recording, tapping anywhere counts as a tap; in pick mode the keyboard strip plays the pitch.
  */
 import { clamp } from '../core/music.js';
@@ -225,7 +225,7 @@ export function createRollInteraction(canvas) {
 
   /* ---------------- touch ---------------- */
   const touches = new Map(); // pointerId → { x, y } of fingers on the canvas
-  let gesture = null;        // { kind: 'pan' | 'pinch' | 'note' | 'key' | 'ruler' | 'done', … }
+  let gesture = null;        // { kind: 'pan' | 'pinch' | 'box' | 'note' | 'key' | 'ruler' | 'done', … }
   let press = null;          // long-press timer
   let lastTouch = -Infinity; // when a finger last lifted (to ignore the native dblclick)
   const dtap = doubleTapper();
@@ -265,6 +265,10 @@ export function createRollInteraction(canvas) {
     if (hitNote(x, y, 14)) {
       gesture = { kind: 'note', x0: x, y0: y };
       onMouseDown(pointerish(e));
+    } else if (dtap.pending(e, 'roll')) { // tap, then press again and drag: box selection (lifting without a drag is a double-tap)
+      gesture = { kind: 'box', x0: x, y0: y, moved: false };
+      onMouseDown(pointerish(e));
+      return; // no long-press menu here
     } else {
       gesture = { kind: 'pan', x0: x, y0: y, scrollX: ui.scrollX, topPitch: ui.topPitch, moved: false };
     }
@@ -308,6 +312,12 @@ export function createRollInteraction(canvas) {
       clampView();
       return;
     }
+    if (g.kind === 'box') {
+      if (!g.moved && Math.hypot(p.x - g.x0, p.y - g.y0) < 8) return; // still a tap
+      g.moved = true;
+      onMouseMove({ clientX: e.clientX, clientY: e.clientY, ctrlKey: false });
+      return;
+    }
     if (g.kind === 'note' || g.kind === 'ruler') {
       if (g.kind === 'note' && !g.moved && Math.hypot(p.x - g.x0, p.y - g.y0) >= 8) { g.moved = true; cancelPress(); }
       onMouseMove({ clientX: e.clientX, clientY: e.clientY, ctrlKey: false });
@@ -332,6 +342,12 @@ export function createRollInteraction(canvas) {
     if (!g) return;
     if (g.kind === 'key') { pickPitchUp(); return; }
     if (g.kind === 'ruler') { onMouseUp(e); return; }
+    if (g.kind === 'box') {
+      onMouseUp(e);
+      if (g.moved || cancelled) dtap.reset();
+      else if (dtap(e, 'roll')) onDblClick(e); // it was a double-tap after all: add a note
+      return;
+    }
     if (g.kind === 'note') {
       const wasDrag = view.drag?.moved;
       onMouseUp(e);
