@@ -797,7 +797,7 @@ function onRemoveAutomation(a) {
 .sec-edge { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 1; }
 .sec-edge.start { left: -3px; }
 .sec-edge.end { right: 0; }
-.sec-edge:hover { background: rgba(255,255,255,.3); }
+.sec-edge:hover { background: color-mix(in srgb, var(--strong) 30%, transparent); }
 .marquee { position: absolute; z-index: 1; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); border-radius: 2px; }
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); pointer-events: none; z-index: 1; opacity: .85; }
 </style>

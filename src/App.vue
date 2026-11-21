@@ -13,6 +13,7 @@ import SongView from './components/SongView.vue';
 import PatternList from './components/PatternList.vue';
 import PatternBar from './components/PatternBar.vue';
 import SoundList from './components/SoundList.vue';
+import SidebarSection from './components/SidebarSection.vue';
 import { project, resetProject } from './stores/project.js';
 import { ui, status } from './stores/ui.js';
 import { installAutosave, installPrefs, restoreSaved } from './stores/persistence.js';
@@ -22,8 +23,11 @@ import { startFrameLoop } from './engine/frame.js';
 import { applyMix } from './engine/mix.js';
 import { refreshSongMix } from './engine/transport.js';
 import { installPianoPreload } from './engine/samples.js';
+import { installTheme } from './stores/theme.js';
 import { restoreSounds, pruneStoredSounds } from './engine/sounds.js';
 import './engine/recorder.js'; // registers the transport/mic recording hooks
+
+installTheme();
 
 if (restoreSaved()) status('Restored your last session.');
 else resetProject();
@@ -47,8 +51,8 @@ onMounted(() => {
   <AppHeader />
   <main v-if="ui.view === 'song'">
     <aside>
-      <PatternList />
-      <SoundList />
+      <SidebarSection id="patterns" title="Patterns" :count="project.patterns.length"><PatternList /></SidebarSection>
+      <SidebarSection id="sounds" title="Sounds" :count="project.sounds.length"><SoundList /></SidebarSection>
       <HelpPanel />
     </aside>
     <SongView />

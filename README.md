@@ -72,6 +72,10 @@ Switch views with **🎼 Song** / **🎹 <pattern name>** in the header.
 
 Older project files open as a single pattern placed at bar 1 of a new song.
 
+## Light and dark mode
+
+The **☀ / ☾** button at the right of the toolbar switches between light and dark. **Settings → Appearance → Theme** has three choices: **System** (the default), **Light** and **Dark**. System follows your computer's setting and changes when it does. Your choice is remembered in this browser.
+
 ## Time signature
 
 **Settings → Time** sets the **time signature**: pick a preset (4/4, 3/4, 2/4, 5/4, 6/8, 7/8, 9/8, 12/8, 2/2), or set **Beats per bar** (1–16) and the **Beat unit** (half, quarter, eighth or sixteenth note) separately. It controls:

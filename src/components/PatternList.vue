@@ -22,7 +22,6 @@ const bars = (p) => Math.round(patternLength(p) / barLen());
 </script>
 
 <template>
-  <h3>Patterns</h3>
   <p class="help top">Click a pattern to select it, then double-click a track to place it, or drag it onto a track.</p>
   <div v-for="p in project.patterns" :key="p.id" class="pattern" :class="{ current: p.id === project.curPattern }"
     draggable="true" role="button" tabindex="0" :aria-pressed="p.id === project.curPattern"

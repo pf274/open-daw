@@ -787,3 +787,32 @@ describe('box selection', () => {
     w.unmount();
   });
 });
+
+describe('sidebar sections', () => {
+  it('patterns and sounds are collapsible sections with counts, remembered per browser', async () => {
+    localStorage.removeItem('open-daw-section-patterns');
+    localStorage.removeItem('open-daw-section-sounds');
+    ui.view = 'song';
+    const w = mount(App, { attachTo: document.body });
+    resetProject();
+    await flushPromises();
+    const heads = () => w.findAll('.side-section .side-head');
+    expect(heads().map((h) => h.find('.title').text())).toEqual(['Patterns', 'Sounds']);
+    expect(heads()[0].find('.count').text()).toBe('1');
+    expect(heads()[0].attributes('aria-expanded')).toBe('true');
+    expect(w.find('.pattern').isVisible()).toBe(true);
+
+    await heads()[0].trigger('click');
+    expect(heads()[0].attributes('aria-expanded')).toBe('false');
+    expect(w.find('.pattern').isVisible()).toBe(false);
+    expect(heads()[1].attributes('aria-expanded')).toBe('true'); // the other section is independent
+    expect(localStorage.getItem('open-daw-section-patterns')).toBe('closed');
+    w.unmount();
+
+    const w2 = mount(App, { attachTo: document.body });
+    await flushPromises();
+    expect(w2.findAll('.side-section .side-head')[0].attributes('aria-expanded')).toBe('false'); // remembered
+    await w2.findAll('.side-section .side-head')[0].trigger('click');
+    w2.unmount();
+  });
+});

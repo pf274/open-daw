@@ -11,6 +11,7 @@ import { setView } from '../engine/song.js';
 import { curPattern } from '../stores/project.js';
 import FileTab from './FileTab.vue';
 import SettingsTab from './SettingsTab.vue';
+import { toggleTheme } from '../stores/theme.js';
 
 const TABS = [{ id: 'file', label: 'File' }, { id: 'settings', label: 'Settings' }];
 
@@ -78,6 +79,10 @@ const liveNote = useFrameValue(() => {
         <button title="Undo (Ctrl+Z)" :disabled="!history.canUndo" @click="undo">↶</button>
         <button title="Redo (Ctrl+Shift+Z)" :disabled="!history.canRedo" @click="redo">↷</button>
       </div>
+
+      <button class="theme" :aria-label="ui.themeResolved === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+        :title="`${ui.themeResolved === 'light' ? 'Dark' : 'Light'} mode (more choices, including following your system, in Settings)`"
+        @click="toggleTheme">{{ ui.themeResolved === 'light' ? '☾' : '☀' }}</button>
     </div>
 
     <div v-if="ui.tab" class="panel" role="tabpanel">
@@ -101,4 +106,5 @@ const liveNote = useFrameValue(() => {
 .meter-fill { height: 100%; background: var(--ok); }
 .live-note { min-width: 86px; font-variant-numeric: tabular-nums; color: var(--dim); }
 .live-note.active { color: var(--text); }
+.theme { margin-left: auto; min-width: 30px; }
 </style>

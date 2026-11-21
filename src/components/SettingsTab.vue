@@ -11,6 +11,7 @@ import { enableMic } from '../engine/mic.js';
 import { setSongTranspose, setTimeSig } from '../engine/editing.js';
 import { SONG_SNAPS } from '../engine/song.js';
 import { pianoSamples } from '../engine/samples.js';
+import { THEMES, setTheme } from '../stores/theme.js';
 import { TIME_SIG_PRESETS, DENOMINATORS, formatTimeSig, parseTimeSig } from '../core/meter.js';
 
 const UNIT_NAMES = { 2: 'half', 4: 'quarter', 8: 'eighth', 16: 'sixteenth' };
@@ -126,6 +127,15 @@ function realign() {
       </label>
       <label><input v-model="ui.showTrace" type="checkbox"> Show whistle trace &amp; taps</label>
       <button title="Rebuild the selected layer's notes from its last take using these settings (replaces notes in the take's range; undoable)" @click="realign">Re-align last take</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Appearance</legend>
+      <label title="Light or dark colours. System follows your computer's setting and switches with it.">Theme
+        <select :value="ui.theme" aria-label="Theme" @change="setTheme($event.target.value)">
+          <option v-for="t in THEMES" :key="t.value" :value="t.value">{{ t.label }}</option>
+        </select>
+      </label>
     </fieldset>
 
     <fieldset>

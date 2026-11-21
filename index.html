@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OpenDAW</title>
+  <meta name="color-scheme" content="dark light">
+  <script>
+    // apply the saved / system theme before anything paints (stores/theme.js takes over once the app loads)
+    try {
+      var t = localStorage.getItem('open-daw-theme');
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = t;
+    } catch (e) { /* storage unavailable: dark */ }
+  </script>
 </head>
 <body>
   <div id="app"></div>

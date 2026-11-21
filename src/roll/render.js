@@ -19,16 +19,34 @@ import { live, isMicOn } from '../engine/mic.js';
 const KEY_LABEL = Object.fromEntries(Object.entries(PIANO_KEYS).map(([c, o]) => [o, keyLabel(c)]));
 export const pitchLabel = (tr, p) => (isDrum(tr) ? (DRUMS[p] ? DRUMS[p].name : String(p)) : noteName(p));
 
-const C = {
-  bg: '#15171c', rowWhite: '#1d2028', rowBlack: '#181b21', octave: '#2c3140',
-  sub: '#22262f', beat: '#2a2f3a', bar: '#3a4050', ruler: '#1d2027', rulerLine: '#323745',
-  keyWhite: '#d9dce3', keyBlack: '#2a2d35', text: '#8b92a3', accent: '#6aa8ff', gold: '#ffd95a', rec: '#ff5a5a',
+/** Canvas colours per theme (the CSS tokens in style.css, plus roll-only shades). */
+const PALETTES = {
+  dark: {
+    keySep: '#15171c', bg: '#15171c', rowWhite: '#1d2028', rowBlack: '#181b21', octave: '#2c3140',
+    sub: '#22262f', beat: '#2a2f3a', bar: '#3a4050', ruler: '#1d2027', rulerLine: '#323745',
+    keyWhite: '#d9dce3', keyBlack: '#2a2d35', keyTextWhite: '#333', keyTextBlack: '#ccc',
+    text: '#8b92a3', accent: '#6aa8ff', accentRgb: '106,168,255', gold: '#ffd95a', goldRgb: '255,217,90', goldDim: '#b07800', rec: '#ff5a5a',
+    strong: '#fff', trace: 'rgba(255,255,255,0.55)', ink: '#0b1020', inkRgb: '11,16,32',
+    drumActive: '#232835', drumOther: '#1c1f27', drumNone: '#16181d',
+    padActive: '#2f3542', padOther: '#252933', padNone: '#1b1e24', padText: '#8b92a3', padNum: '#4a5060',
+  },
+  light: {
+    keySep: '#c9ceda', bg: '#f3f4f7', rowWhite: '#ffffff', rowBlack: '#eef0f4', octave: '#c9ceda',
+    sub: '#eceef3', beat: '#dde1e8', bar: '#b8bfcc', ruler: '#ffffff', rulerLine: '#d0d5df',
+    keyWhite: '#ffffff', keyBlack: '#3a3f4b', keyTextWhite: '#444', keyTextBlack: '#ddd',
+    text: '#5c6476', accent: '#2f6fd6', accentRgb: '47,111,214', gold: '#a86f00', goldRgb: '214,150,0', goldDim: '#a86f00', rec: '#d93636',
+    strong: '#1c2130', trace: 'rgba(28,33,48,0.5)', ink: '#0b1020', inkRgb: '11,16,32',
+    drumActive: '#ffffff', drumOther: '#f3f4f7', drumNone: '#e9ecf2',
+    padActive: '#dfe6f3', padOther: '#e9ecf2', padNone: '#f3f4f7', padText: '#5c6476', padNum: '#a0a7b5',
+  },
 };
+let C = PALETTES.dark;
 
 export function renderRoll(g) {
   const { W, H } = view;
   if (!W) return;
   const P = toRaw(project), U = toRaw(ui), s = P.settings;
+  C = PALETTES[U.themeResolved] || PALETTES.dark;
   const tr = toRaw(curTrack());
   const drumView = isDrum(tr);
   view.KEYW = drumView ? KEYW_DRUMS : KEYW_NORMAL;
@@ -41,7 +59,7 @@ export function renderRoll(g) {
   const pTop = Math.ceil(U.topPitch), pBot = yp(H) - 1;
   for (let p = pTop; p >= pBot; p--) {
     const y = py(p);
-    g.fillStyle = drumView ? (DRUMS[p] ? (DRUMS[p].bank === U.drumBank ? '#232835' : '#1c1f27') : '#16181d') : isBlack(p) ? C.rowBlack : C.rowWhite;
+    g.fillStyle = drumView ? (DRUMS[p] ? (DRUMS[p].bank === U.drumBank ? C.drumActive : C.drumOther) : C.drumNone) : isBlack(p) ? C.rowBlack : C.rowWhite;
     g.fillRect(KEYW, y, W - KEYW, U.row);
     if (!drumView && mod12(p) === 0) { g.fillStyle = C.octave; g.fillRect(KEYW, y + U.row - 1, W - KEYW, 1); }
   }
@@ -59,7 +77,7 @@ export function renderRoll(g) {
     g.fillRect(Math.round(bx(b)), RULER, 1, H);
   }
   if (U.loop) {
-    g.fillStyle = 'rgba(106,168,255,0.06)';
+    g.fillStyle = `rgba(${C.accentRgb},0.06)`;
     g.fillRect(bx(U.loopStart), RULER, (U.loopEnd - U.loopStart) * U.ppb, H);
   }
 
@@ -84,7 +102,7 @@ export function renderRoll(g) {
     : tr.take;
   if (U.showTrace && traceTake) {
     const spb = 60 / traceTake.bpm;
-    g.fillStyle = 'rgba(255,255,255,0.55)';
+    g.fillStyle = C.trace;
     for (const f of traceTake.frames) {
       if (!(f.midi > 0) || f.c < s.minClarity) continue;
       const x = bx(traceTake.startBeat + f.t / spb);
@@ -96,10 +114,10 @@ export function renderRoll(g) {
   /* pick mode highlights */
   const curPick = pick.active ? toRaw(pickNote()) : null;
   if (curPick) {
-    g.fillStyle = 'rgba(255,217,90,0.08)';
+    g.fillStyle = `rgba(${C.goldRgb},0.08)`;
     g.fillRect(bx(curPick.start), RULER, Math.max(3, curPick.dur * U.ppb), H);
     if (!drumView) {
-      g.fillStyle = 'rgba(255,217,90,0.05)';
+      g.fillStyle = `rgba(${C.goldRgb},0.05)`;
       g.fillRect(KEYW, py(pick.base + 17), W - KEYW, 18 * U.row);
     }
   }
@@ -122,20 +140,20 @@ export function renderRoll(g) {
     if (n === curPick) {
       if (pick.hold) { // hold-to-confirm progress
         const p = clamp((performance.now() - pick.hold.t0) / pick.hold.ms, 0, 1);
-        g.fillStyle = 'rgba(255,217,90,0.85)';
+        g.fillStyle = `rgba(${C.goldRgb},0.85)`;
         g.fillRect(x, y + 1, w * p, U.row - 2);
       }
       g.strokeStyle = C.gold; g.lineWidth = 2;
       g.strokeRect(x + 1, y + 2, w - 2, U.row - 4);
     } else if (U.sel.has(n.id)) {
-      g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+      g.strokeStyle = C.strong; g.lineWidth = 1.5;
       g.strokeRect(x + 0.75, y + 1.75, w - 1.5, U.row - 3.5);
     }
     if (hasTremor(n)) drawTremor(g, n, x, w, y, U, 60 / P.bpm);
     if (w > 28 && U.row >= 11) {
       g.save();
       g.beginPath(); g.rect(x, y, w, U.row); g.clip();
-      g.fillStyle = '#0b1020'; g.font = '10px system-ui'; g.textBaseline = 'middle';
+      g.fillStyle = C.ink; g.font = '10px system-ui'; g.textBaseline = 'middle';
       g.fillText(pitchLabel(tr, n.pitch), x + 3, y + U.row / 2 + 0.5);
       g.restore();
     }
@@ -147,7 +165,7 @@ export function renderRoll(g) {
   const d = view.drag;
   if (d && d.mode === 'box') {
     const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1), w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0);
-    g.fillStyle = 'rgba(106,168,255,0.12)'; g.fillRect(x, y, w, h);
+    g.fillStyle = `rgba(${C.accentRgb},0.12)`; g.fillRect(x, y, w, h);
     g.strokeStyle = C.accent; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w, h);
   }
 
@@ -157,7 +175,7 @@ export function renderRoll(g) {
   /* playhead */
   const ph = bx(currentBeat());
   if (ph >= KEYW) {
-    g.fillStyle = transport.recording ? C.rec : '#fff';
+    g.fillStyle = transport.recording ? C.rec : C.strong;
     g.fillRect(Math.round(ph), 0, 1.5, H);
   }
 }
@@ -176,7 +194,7 @@ function drawTremor(g, n, x, w, y, U, spb) {
   g.moveTo(x, cy);
   let up = true;
   for (let px = x + half / 2; px < x + w + half; px += half, up = !up) g.lineTo(px, up ? cy - amp : cy + amp);
-  g.strokeStyle = 'rgba(11,16,32,0.75)';
+  g.strokeStyle = `rgba(${C.inkRgb},0.75)`;
   g.lineWidth = 1.25;
   g.lineJoin = 'miter';
   g.stroke();
@@ -220,20 +238,20 @@ function drawKeys(g, { pTop, pBot, drumView, U, s }) {
     const y = py(p), cy = y + U.row / 2 + 0.5;
     if (drumView) {
       const d = DRUMS[p], active = d && d.bank === U.drumBank;
-      g.fillStyle = d ? (active ? '#2f3542' : '#252933') : '#1b1e24';
+      g.fillStyle = d ? (active ? C.padActive : C.padOther) : C.padNone;
       g.fillRect(0, y, KEYW, U.row);
-      g.fillStyle = C.bg; g.fillRect(0, y + U.row - 1, KEYW, 1);
+      g.fillStyle = C.keySep; g.fillRect(0, y + U.row - 1, KEYW, 1);
       if (d) {
-        g.fillStyle = active ? C.keyWhite : '#8b92a3'; g.fillText(d.name, 4, cy);
+        g.fillStyle = active ? C.strong : C.padText; g.fillText(d.name, 4, cy);
         if (active) { g.fillStyle = C.gold; g.textAlign = 'right'; g.fillText(keyLabel(d.key), KEYW - 4, cy); g.textAlign = 'left'; }
-      } else if (U.row >= 12) { g.fillStyle = '#4a5060'; g.fillText(String(p), 4, cy); }
+      } else if (U.row >= 12) { g.fillStyle = C.padNum; g.fillText(String(p), 4, cy); }
       continue;
     }
     g.fillStyle = isBlack(p) ? C.keyBlack : C.keyWhite;
     g.fillRect(0, y, KEYW, U.row);
-    g.fillStyle = C.bg; g.fillRect(0, y + U.row - 1, KEYW, 1);
+    g.fillStyle = C.keySep; g.fillRect(0, y + U.row - 1, KEYW, 1);
     if (mod12(p) === 0 || U.row >= 16) {
-      g.fillStyle = isBlack(p) ? '#ccc' : '#333';
+      g.fillStyle = isBlack(p) ? C.keyTextBlack : C.keyTextWhite;
       g.fillText(noteName(p), 4, cy);
     }
   }
@@ -243,7 +261,7 @@ function drawKeys(g, { pTop, pBot, drumView, U, s }) {
     for (let o = 0; o <= 17; o++) {
       const p = pick.base + o;
       if (p > pTop || p < pBot) continue;
-      g.fillStyle = isBlack(p) ? C.gold : '#b07800';
+      g.fillStyle = isBlack(p) ? PALETTES.dark.gold : C.goldDim;
       g.fillText(KEY_LABEL[o], KEYW - 3, py(p) + U.row / 2 + 0.5);
     }
     g.textAlign = 'left';
@@ -260,7 +278,7 @@ function drawRuler(g, { b0, b1, U, s, traceTake }) {
   const { W } = view, KEYW = view.KEYW;
   g.fillStyle = C.ruler; g.fillRect(0, 0, W, RULER);
   if (U.loop || view.drag?.mode === 'loop') {
-    g.fillStyle = 'rgba(106,168,255,0.35)';
+    g.fillStyle = `rgba(${C.accentRgb},0.35)`;
     g.fillRect(bx(U.loopStart), 0, (U.loopEnd - U.loopStart) * U.ppb, RULER);
   }
   g.font = '11px system-ui'; g.textBaseline = 'middle';

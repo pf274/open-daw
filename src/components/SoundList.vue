@@ -32,7 +32,6 @@ const fmtLen = (d) => (d < 10 ? `${d.toFixed(1)} s` : d < 60 ? `${Math.round(d)}
 </script>
 
 <template>
-  <h3>Sounds</h3>
   <p v-if="!project.sounds.length" class="help top">Import audio files (WAV, MP3, OGG…) to use as sound effects, or drop them straight onto a track.</p>
   <div v-for="s in project.sounds" :key="s.id" class="sound" :class="{ missing: soundState.missing[s.id] }"
     :draggable="!!soundState.ready[s.id]" :title="soundState.missing[s.id] ? `The audio of “${s.name}” isn’t in this browser — open the saved project file to restore it` : `Drag “${s.name}” onto a track`"
@@ -57,7 +56,6 @@ const fmtLen = (d) => (d < 10 ? `${d.toFixed(1)} s` : d < 60 ? `${Math.round(d)}
 </template>
 
 <style scoped>
-h3 { margin-top: 14px; }
 .top { margin: -2px 0 8px; }
 .sound { border: 1px solid var(--line); border-radius: 6px; padding: 6px; margin-bottom: 6px; background: var(--panel2); cursor: grab; }
 .sound:active { cursor: grabbing; }
