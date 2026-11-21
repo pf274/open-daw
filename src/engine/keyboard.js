@@ -9,6 +9,7 @@ import { pick, pickKeyDown, pickKeyUp, pickBlur } from './pick.js';
 import { ACTIONS, transposeSel } from './editing.js';
 import { deleteSelectedClips, duplicateSelectedClips, selectAllClips, copySelectedClips, cutSelectedClips, pasteClips, nudgeSelectedClips } from './song.js';
 import { deleteSelectedPoint } from './automation.js';
+import { exportState, cancelExport } from './files.js';
 
 const isField = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA');
 
@@ -17,6 +18,10 @@ export const seekHome = restartTransport;
 
 function onKeyDown(e) {
   if (modalOpen()) return; // the dialog handles its own keys
+  if (exportState.rendering) { // the export overlay is up: Esc cancels, nothing else
+    if (e.key === 'Escape') { e.preventDefault(); cancelExport(); }
+    return;
+  }
   if (ui.ctxMenu.open) {
     ui.ctxMenu.open = false;
     if (e.key === 'Escape') { e.preventDefault(); return; }

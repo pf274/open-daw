@@ -99,7 +99,18 @@ export function exportMidi() {
 }
 
 /* ---------- audio (WAV) export: renders the same synths offline, slides included ---------- */
-export const exportState = reactive({ rendering: false });
+/**
+ * While a WAV export runs (the progress overlay shows this):
+ *   phase    'samples' (loading the piano recordings) → 'render' → 'encode'
+ *   progress 0–1 while rendering, or null when it can't be measured
+ */
+export const exportState = reactive({ rendering: false, phase: '', progress: null, scope: 'pattern', cancelled: false });
+const PROGRESS_STEPS = 100; // the render pauses this many times to report how far it has got
+
+/** Stop the export that is running (it is dropped at its next progress pause). */
+export function cancelExport() { if (exportState.rendering) exportState.cancelled = true; }
+class Cancelled extends Error {}
+
 const TAIL_S = 2;     // let releases/cymbals ring out
 const LEAD_S = 0.05;
 
@@ -115,8 +126,12 @@ function reverbTail(scope) {
 }
 export const renderLength = (scope = exportScope()) => (scope === 'song' ? songLength() : songEnd()) * (60 / project.bpm) + LEAD_S + Math.max(TAIL_S, reverbTail(scope) + 0.3);
 
-export async function renderSong(sampleRate = 44100, scope = exportScope()) {
-  if (pianoSamplesEnabled()) await ensurePianoSamples(pianoNotesFor(playedLayers(scope))); // render the real piano
+/**
+ * @param onProgress  (0–1) => void, called as the render advances (where the browser can pause
+ *                    an offline render); return false to stop it (the promise then rejects).
+ */
+export async function renderSong(sampleRate = 44100, scope = exportScope(), { onSamples = null, onProgress = null } = {}) {
+  if (pianoSamplesEnabled()) { onSamples?.(); await ensurePianoSamples(pianoNotesFor(playedLayers(scope))); } // render the real piano
   const spb = 60 / project.bpm;
   const off = new OfflineAudioContext(2, Math.ceil(renderLength(scope) * sampleRate), sampleRate);
   const master = buildMasterChain(off, ui.masterVol);
@@ -138,6 +153,24 @@ export async function renderSong(sampleRate = 44100, scope = exportScope()) {
     }
     if (graph) scheduleSoundClips(off, graph, -Infinity, Infinity, at, spb);
   });
+  if (onProgress && typeof off.suspend === 'function') {
+    let stopped = false;
+    const rendered = new Promise((resolve, reject) => {
+      // pause at even steps (on whole render blocks) to report progress; each pause resumes unless stopped
+      const block = 128 / sampleRate, total = off.length / sampleRate;
+      for (let i = 1; i < PROGRESS_STEPS; i++) {
+        const t = Math.floor((total * i) / PROGRESS_STEPS / block) * block;
+        if (t <= 0 || t >= total) continue;
+        off.suspend(t).then(() => {
+          if (stopped) return;
+          if (onProgress(t / total) === false) { stopped = true; reject(new Cancelled('Cancelled')); return; } // left suspended: dropped
+          off.resume();
+        }).catch(() => {}); // a duplicate pause time (very short renders): just skip it
+      }
+      off.startRendering().then((buf) => { onProgress(1); resolve(buf); }, reject);
+    });
+    return rendered;
+  }
   return off.startRendering();
 }
 
@@ -145,21 +178,33 @@ export async function exportWav() {
   if (exportState.rendering) return;
   const scope = exportScope();
   if (!buildSong(scope).tracks.length && !(scope === 'song' && playableSoundClips())) { status(nothing(scope), true); return; }
-  exportState.rendering = true;
+  Object.assign(exportState, { rendering: true, phase: 'render', progress: null, scope, cancelled: false });
   status(`Rendering the ${scope}…`);
   try {
-    const buf = await renderSong(44100, scope);
+    const buf = await renderSong(44100, scope, {
+      onSamples: () => { exportState.phase = 'samples'; },
+      onProgress: (f) => {
+        exportState.phase = 'render';
+        exportState.progress = f;
+        return !exportState.cancelled;
+      },
+    });
+    if (exportState.cancelled) throw new Cancelled('Cancelled');
+    exportState.phase = 'encode';
+    await nextFrame(); // let the overlay say so before the (blocking) encode
     const file = exportFileName(scope).replace(/\.mid$/, '.wav');
     download(file, encodeWav([buf.getChannelData(0), buf.getChannelData(1)], buf.sampleRate), 'audio/wav');
     status(`Exported ${file} (${buf.duration.toFixed(1)} s, slides included).`);
   } catch (err) {
-    status('Audio export failed: ' + err.message, true);
+    if (err instanceof Cancelled) status('Audio export cancelled.');
+    else status('Audio export failed: ' + err.message, true);
   } finally {
-    exportState.rendering = false;
+    Object.assign(exportState, { rendering: false, phase: '', progress: null, cancelled: false });
   }
 }
 
 /** Song clips of imported sounds whose audio is loaded (they export as audio, not MIDI). */
+const nextFrame = () => new Promise((r) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(r)) : setTimeout(r)));
 const playableSoundClips = () => project.song.clips.some((c) => c.soundId != null && soundBuffer(c.soundId) && songTrackById(c.trackId) && songTrackAudible(songTrackById(c.trackId)));
 
 /** Download the project as JSON, with imported sounds' audio embedded (base64) so the file is self-contained. */

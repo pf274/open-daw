@@ -10,6 +10,7 @@ import TremorModal from './components/TremorModal.vue';
 import QuantizeModal from './components/QuantizeModal.vue';
 import SynthModal from './components/SynthModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import ExportOverlay from './components/ExportOverlay.vue';
 import SongView from './components/SongView.vue';
 import PatternList from './components/PatternList.vue';
 import PatternBar from './components/PatternBar.vue';
@@ -83,4 +84,5 @@ onMounted(() => {
   <QuantizeModal />
   <SynthModal />
   <ConfirmModal />
+  <ExportOverlay />
 </template>
