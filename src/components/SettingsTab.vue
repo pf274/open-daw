@@ -1,13 +1,15 @@
 <script setup>
 import { computed } from 'vue';
 import { SCALES } from '../core/scales.js';
-import { NOTE_NAMES, clamp, transposeLabel } from '../core/music.js';
+import { NOTE_NAMES, clamp, transposeLabel, noteName } from '../core/music.js';
 import { project, curTrack } from '../stores/project.js';
 import { ui, status } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
 import { SNAP_OPTIONS } from '../stores/options.js';
 import { applyTake } from '../engine/recorder.js';
-import { enableMic } from '../engine/mic.js';
+import { enableMic, disableMic, live } from '../engine/mic.js';
+import { transport } from '../engine/transport.js';
+import { useFrameValue } from '../composables/useFrameValue.js';
 import { setSongTranspose, setTimeSig } from '../engine/editing.js';
 import { SONG_SNAPS } from '../engine/song.js';
 import { pianoSamples } from '../engine/samples.js';
@@ -38,6 +40,24 @@ const ALIGN_FIELDS = [
   ['minClarity', 'Min pitch clarity', 'Pitch frames below this confidence are ignored', { step: 0.05, min: 0, max: 1 }],
 ];
 
+/* tempo: one undo step per change; locked while playing */
+function onBpm(e) {
+  const v = clamp(Math.round(+e.target.value) || 100, 30, 300);
+  if (v !== project.bpm) { pushUndo(); project.bpm = v; }
+  e.target.value = v;
+}
+
+/* microphone: on/off, level meter and the note it hears (recording switches it on by itself) */
+const toggleMic = () => (ui.mic.on ? (disableMic(), status('Mic off.')) : enableMic());
+const meter = useFrameValue(() => (ui.mic.on ? clamp(live.rms * 6, 0, 1) : 0));
+const liveNote = useFrameValue(() => {
+  if (!ui.mic.on) return { text: '', active: false };
+  const s = project.settings;
+  if (!(live.midi > 0 && live.clarity >= s.minClarity)) return { text: '·', active: false };
+  const r = Math.round(live.midi), cents = Math.round((live.midi - r) * 100);
+  return { text: `${noteName(r)} ${cents >= 0 ? '+' : ''}${cents}¢ → ${noteName(Math.round(live.midi + s.transpose))}`, active: true };
+});
+
 function onCountIn(e) { ui.countIn = clamp(Math.round(+e.target.value) || 0, 0, 16); e.target.value = ui.countIn; }
 const onDevice = () => { if (ui.mic.on) enableMic(); };
 
@@ -54,6 +74,8 @@ function realign() {
   <div class="settings">
     <fieldset>
       <legend>Time</legend>
+      <label title="Tempo in beats per minute (can't change while playing)">BPM
+        <input type="number" min="30" max="300" step="1" :value="project.bpm" :disabled="transport.playing" aria-label="BPM" @change="onBpm"></label>
       <label title="Common time signatures">Time signature
         <select :value="tsPreset" aria-label="Time signature preset" @change="onPreset">
           <option v-for="p in TIME_SIG_PRESETS" :key="p" :value="p">{{ p }}</option>
@@ -140,6 +162,11 @@ function realign() {
 
     <fieldset>
       <legend>Input &amp; pick mode</legend>
+      <span class="mic">
+        <button :class="{ on: ui.mic.on }" :aria-pressed="ui.mic.on" title="Switch the microphone on to see the note you whistle (● Rec switches it on by itself)" @click="toggleMic">🎤 Mic</button>
+        <span v-if="ui.mic.on" class="meter" role="meter" aria-label="Mic level" :aria-valuenow="Math.round(meter * 100)" aria-valuemin="0" aria-valuemax="100"><span class="meter-fill" :style="{ width: (meter * 100).toFixed(0) + '%' }"></span></span>
+        <span v-if="ui.mic.on" class="live-note" :class="{ active: liveNote.active }">{{ liveNote.text }}</span>
+      </span>
       <label>Mic input
         <select v-model="ui.mic.deviceId" @change="onDevice">
           <option value="">default</option>
@@ -161,5 +188,10 @@ fieldset.wide { flex: 1 1 520px; }
 legend { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 0 4px; }
 select { max-width: 170px; }
 .note { color: var(--dim); }
+.mic { display: inline-flex; align-items: center; gap: 6px; }
+.meter { display: inline-block; width: 60px; height: 8px; background: var(--panel); border-radius: 4px; overflow: hidden; }
+.meter-fill { display: block; height: 100%; background: var(--ok); }
+.live-note { min-width: 86px; font-variant-numeric: tabular-nums; color: var(--dim); }
+.live-note.active { color: var(--text); }
 .note.warn { color: var(--warn); }
 </style>

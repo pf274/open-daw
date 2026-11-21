@@ -449,3 +449,32 @@ describe('remembered preferences', () => {
     expect(loadPref('whistle-midi-metronome', true)).toBe(true); // first visit: on
   });
 });
+
+describe('toolbar vs settings', () => {
+  it('BPM and the mic switch live in Settings, not the toolbar; BPM changes are undoable', async () => {
+    const App = (await import('../src/App.vue')).default;
+    const { project } = await import('../src/stores/project.js');
+    const { ui } = await import('../src/stores/ui.js');
+    const { undo } = await import('../src/stores/history.js');
+    ui.view = 'pattern';
+    ui.tab = 'file';
+    const w = mount(App, { attachTo: document.body });
+    await flushPromises();
+    const bar = () => w.find('.bar.top');
+    expect(bar().text()).not.toContain('BPM');
+    expect(bar().text()).not.toContain('Mic');
+    expect(bar().text()).toContain('Metronome');
+    expect(bar().text()).toContain('⏮ Restart');
+
+    ui.tab = 'settings';
+    await flushPromises();
+    const bpm = w.find('.settings input[aria-label="BPM"]');
+    await bpm.setValue('132');
+    await bpm.trigger('change');
+    expect(project.bpm).toBe(132);
+    undo();
+    expect(project.bpm).not.toBe(132);
+    expect(w.find('.settings button[aria-pressed]').text()).toContain('Mic');
+    w.unmount();
+  });
+});

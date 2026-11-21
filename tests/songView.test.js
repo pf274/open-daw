@@ -41,7 +41,10 @@ describe('Song view', () => {
     expect(clipsIn(w, 0)[0].text()).toContain('Pattern 1');
     expect(clipsIn(w, 0)[0].findAll('svg.preview rect')).toHaveLength(2); // note preview
     expect(clipsIn(w, 0)[0].attributes('style')).toContain(`width: ${2 * ui.barPx - 2}px`); // 2 bars long
-    expect(button(w, '● Rec').attributes('disabled')).toBeDefined();
+    expect(button(w, '● Rec')).toBeUndefined(); // recording happens in the pattern editor
+    expect(button(w, '🥁 Tap rhythm')).toBeUndefined();
+    expect(button(w, '🎼 Song')).toBeUndefined(); // already here
+    expect(button(w, '🎹')).toBeUndefined(); // patterns open from the side panel / clip menu
   });
 
   it('tracks can be renamed and recoloured on the left', async () => {
@@ -105,7 +108,7 @@ describe('Song view', () => {
     expect(curPattern().id).toBe(variation.id);
     expect(w.find('canvas').exists()).toBe(true);
     expect(w.find('select[aria-label="Pattern being edited"]').element.value).toBe(String(variation.id));
-    expect(button(w, '🎹').text()).toContain('Pattern 1 (variation)');
+    expect(button(w, '● Rec')).toBeDefined();
 
     await button(w, '🎼 Song').trigger('click');
     await clipsIn(w, 0)[0].trigger('dblclick');
@@ -814,5 +817,124 @@ describe('sidebar sections', () => {
     expect(w2.findAll('.side-section .side-head')[0].attributes('aria-expanded')).toBe('false'); // remembered
     await w2.findAll('.side-section .side-head')[0].trigger('click');
     w2.unmount();
+  });
+});
+
+describe('confirming deletes', () => {
+  it('deleting a pattern or a sound asks first, in a dialog; Cancel / Esc keep it, the button deletes', async () => {
+    const { cacheSound } = await import('../src/audio/soundBank.js');
+    const { newPattern } = await import('../src/engine/song.js');
+    ui.view = 'song';
+    const w = mount(App, { attachTo: document.body });
+    resetProject();
+    const p2 = newPattern();
+    project.sounds.push({ id: 7401, key: 'k7401', name: 'Snap', duration: 1, vol: 0.8, mime: '', size: 1 });
+    cacheSound(7401, { length: 10, duration: 1, sampleRate: 10, numberOfChannels: 1, getChannelData: () => new Float32Array(10) });
+    await flushPromises();
+    const dialog = () => w.find('[role=dialog]');
+    const del = (label) => w.find(`button[aria-label="Delete ${label}"]`);
+
+    await del('Pattern 1').trigger('click');
+    await flushPromises();
+    expect(dialog().text()).toContain('Delete pattern “Pattern 1”?');
+    expect(dialog().text()).toContain('used 1 time in the song');
+    expect(document.activeElement.textContent).toBe('Cancel'); // a stray Enter doesn't delete
+    await dialog().findAll('button').find((b) => b.text() === 'Cancel').trigger('click');
+    await flushPromises();
+    expect(dialog().exists()).toBe(false);
+    expect(project.patterns).toHaveLength(2);
+
+    await del('Pattern 2').trigger('click');
+    await flushPromises();
+    expect(dialog().text()).toContain('isn’t used in the song');
+    await dialog().trigger('keydown', { key: 'Escape' });
+    await flushPromises();
+    expect(project.patterns).toHaveLength(2);
+    await del('Pattern 2').trigger('click');
+    await flushPromises();
+    await dialog().find('button.danger').trigger('click');
+    await flushPromises();
+    expect(project.patterns.map((p) => p.id)).not.toContain(p2.id);
+
+    await del('Snap').trigger('click');
+    await flushPromises();
+    expect(dialog().text()).toContain('Delete sound “Snap”?');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })); // global shortcuts pause while it's open
+    await dialog().find('button.danger').trigger('click');
+    await flushPromises();
+    expect(project.sounds).toHaveLength(0);
+    expect(project.song.clips).toHaveLength(1); // the Delete key didn't remove clips meanwhile
+    w.unmount();
+  });
+});
+
+describe('folding the track column', () => {
+  it('« folds the track headers to colour strips (remembered); a strip opens that row’s actions; » unfolds', async () => {
+    localStorage.removeItem('open-daw-head-collapsed');
+    ui.headCollapsed = false;
+    ui.view = 'song';
+    const w = mount(App, { attachTo: document.body });
+    resetProject();
+    await flushPromises();
+    const fold = () => w.find('button.fold');
+    expect(fold().attributes('aria-expanded')).toBe('true');
+    expect(w.findAll('.strip')).toHaveLength(0);
+
+    await fold().trigger('click');
+    expect(ui.headCollapsed).toBe(true);
+    expect(localStorage.getItem('open-daw-head-collapsed')).toBe('true');
+    expect(w.find('.song-view').classes()).toContain('collapsed');
+    expect(w.find('.song-view').attributes('style')).toContain('--head-w: 28px');
+    const strips = w.findAll('.lane-row .strip');
+    expect(strips).toHaveLength(4);
+    expect(strips[1].attributes('style')).toContain(`background: ${project.song.tracks[1].color}`);
+    expect(w.findAll('.lane-row')[0].find('input[type=color]').exists()).toBe(true); // still there for "Change colour…"
+
+    await strips[1].trigger('click');
+    expect(ui.ctxMenu).toMatchObject({ open: true, kind: 'custom' });
+    expect(w.find('.ctx').text()).toContain('Track 2');
+    await w.findAll('.ctx button[role=menuitem]').find((b) => b.text() === 'Mute').trigger('click');
+    expect(project.song.tracks[1].mute).toBe(true);
+    expect(w.findAll('.lane-row .strip')[1].classes()).toContain('off');
+
+    // clips still line up with the narrower column
+    const lane = w.findAll('.lane')[2];
+    lane.element.getBoundingClientRect = () => ({ left: 28, top: 0, width: 2000, height: 56 });
+    await lane.trigger('dblclick', { clientX: 28 + ui.barPx });
+    expect(project.song.clips.at(-1)).toMatchObject({ trackId: project.song.tracks[2].id, start: 4 });
+
+    await fold().trigger('click');
+    expect(ui.headCollapsed).toBe(false);
+    expect(w.findAll('.strip')).toHaveLength(0);
+    w.unmount();
+    localStorage.removeItem('open-daw-head-collapsed');
+  });
+});
+
+describe('Restart button', () => {
+  it('sits next to Play and Stop, moves the song playhead to the start, scrolls back, and is off while recording', async () => {
+    const { transport } = await import('../src/engine/transport.js');
+    ui.view = 'song';
+    const w = mount(App, { attachTo: document.body });
+    await flushPromises();
+    const labels = w.findAll('header button').map((b) => b.text());
+    const i = labels.indexOf('■ Stop');
+    expect(labels[i - 1]).toBe('▶ Play');
+    expect(labels[i + 1]).toBe('⏮ Restart');
+    ui.songPlayhead = 9;
+    await flushPromises();
+    w.find('.scroller').element.scrollLeft = 500;
+    await button(w, '⏮ Restart').trigger('click');
+    await flushPromises();
+    expect(ui.songPlayhead).toBe(0);
+    expect(w.find('.scroller').element.scrollLeft).toBe(0);
+    ui.songPlayhead = 4;
+    key('Home');
+    expect(ui.songPlayhead).toBe(0);
+    transport.recording = true;
+    await flushPromises();
+    expect(button(w, '⏮ Restart').attributes('disabled')).toBeDefined();
+    transport.recording = false;
+    w.unmount();
   });
 });

@@ -242,6 +242,66 @@ describe('phone layout and the Song view by touch', () => {
     expect(project.song.automation).toHaveLength(0);
   });
 
+  it('song sections by touch: double-tap the strip adds one, long-press menus add / rename / delete, a swipe adds nothing', async () => {
+    await new Promise((res) => setTimeout(res, 750)); // clear of earlier double-taps
+    const strip = w.find('.sections');
+    strip.element.getBoundingClientRect = () => ({ left: 0, top: 0, width: 4000, height: 22 });
+    const t = { pointerType: 'touch', button: 0 };
+    await strip.trigger('pointerdown', { ...t, clientX: 72 * 2.5 });
+    expect(project.song.sections).toHaveLength(0); // no drag-to-create with a finger (that scrolls)
+    await strip.trigger('pointerup', { ...t, clientX: 72 * 2.5 });
+    await strip.trigger('pointerup', { ...t, clientX: 72 * 2.5 });
+    expect(project.song.sections.map((x) => [x.name, x.start, x.end])).toEqual([['Intro', 8, 24]]); // bar 3, 4 bars
+    await flushPromises();
+    await w.find('input.sec-name').trigger('blur');
+    await strip.trigger('dblclick', { clientX: 72 * 2.5 }); // the browser's own dblclick that follows: ignored
+    expect(project.song.sections).toHaveLength(1);
+
+    await strip.trigger('contextmenu', { clientX: 72 * 10.2, clientY: 5 }); // long-press (dispatched by the long-press helper)
+    const item = (label) => w.findAll('.ctx button[role=menuitem]').find((b) => b.text().startsWith(label));
+    expect(w.find('.ctx').text()).toContain('Bar 11');
+    await item('Add section here (8 bars)').trigger('click');
+    expect(project.song.sections.at(-1)).toMatchObject({ name: 'Verse', start: 40, end: 72 });
+    await flushPromises();
+    await w.find('input.sec-name').trigger('blur');
+
+    const sec = () => w.findAll('.section')[0];
+    await sec().trigger('contextmenu', { clientX: 200, clientY: 5 });
+    expect(w.find('.ctx').text()).toContain('Intro');
+    await item('Rename').trigger('click');
+    await flushPromises();
+    expect(sec().find('input.sec-name').exists()).toBe(true);
+    await sec().find('input.sec-name').setValue('Opening');
+    await sec().find('input.sec-name').trigger('blur');
+    expect(project.song.sections[0].name).toBe('Opening');
+
+    await new Promise((res) => setTimeout(res, 400));
+    for (let i = 0; i < 2; i++) { // double-tap a section: rename
+      await sec().find('.sec-label').trigger('pointerdown', { ...t, clientX: 200 });
+      await sec().find('.sec-label').trigger('pointerup', { ...t, clientX: 200 }); // bubbles to the window, where the drag listens
+    }
+    await flushPromises();
+    expect(sec().find('input.sec-name').exists()).toBe(true);
+    await sec().find('input.sec-name').trigger('blur');
+
+    await sec().trigger('contextmenu', { clientX: 200, clientY: 5 });
+    await item('Delete section').trigger('click');
+    expect(project.song.sections.map((x) => x.name)).toEqual(['Verse']);
+  });
+
+  it('the Sections strip is taller on a touch screen, and the rows below line up with it', async () => {
+    expect(w.find('.sections-row').attributes('style')).toContain('height: 22px');
+    device.coarse = true;
+    await flushPromises();
+    expect(w.find('.sections-row').attributes('style')).toContain('height: 36px');
+    // dragging a row's grip: the drop line is measured from below the (taller) header rows
+    const grip = w.findAll('.lane-row')[2].find('.grip');
+    await grip.trigger('pointerdown', { button: 0, clientY: 2 * 56 + 28, pointerId: 1 });
+    await grip.trigger('pointermove', { clientY: 70, pointerId: 1 });
+    expect(w.find('.drop-line').attributes('style')).toContain(`top: ${24 + 36 + 56}px`);
+    await grip.trigger('pointerup', { pointerId: 1 });
+  });
+
   it('a sound picked in the list (no drag and drop on a phone) is what double-tap places', async () => {
     const { cacheSound } = await import('../src/audio/soundBank.js');
     project.sounds.push({ id: 7301, key: 'k7301', name: 'Clap', duration: 1, vol: 0.8, mime: '', size: 1 });

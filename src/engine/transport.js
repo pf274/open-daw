@@ -95,6 +95,18 @@ export function stopTransport() {
   cb?.();
 }
 
+/**
+ * Restart (button / Home): put the playhead of the open view back at the beginning and scroll there.
+ * While playing, playback carries on from the start. Not while recording.
+ */
+export function restartTransport() {
+  if (transport.recording) return;
+  const song = ui.view === 'song';
+  if (song) ui.songPlayhead = 0;
+  else { ui.playhead = 0; ui.scrollX = 0; }
+  if (transport.playing) startTransport(0, { song });
+}
+
 export function schedule() {
   if (!transport.playing) return;
   const actx = getCtx();

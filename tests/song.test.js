@@ -292,6 +292,36 @@ describe('song playback', () => {
     expect(project.song.sections).toHaveLength(4);
   });
 
+  it('Restart puts the open view’s playhead at the beginning; while playing it plays on from there', async () => {
+    const { restartTransport } = await import('../src/engine/transport.js');
+    ui.view = 'song';
+    ui.songPlayhead = 12;
+    ui.playhead = 5;
+    restartTransport();
+    expect(ui.songPlayhead).toBe(0);
+    expect(ui.playhead).toBe(5); // the pattern's own playhead is left alone
+    expect(transport.playing).toBe(false); // stopped stays stopped
+
+    curPattern().layers[0].notes = [note(1, 0, 1, 60)];
+    clock.t = 0;
+    startTransport(6, { song: true });
+    clock.t = 1;
+    voices.length = 0;
+    restartTransport();
+    expect(transport.playing).toBe(true);
+    clock.t = 60;
+    schedule();
+    expect(voices.map((v) => v[2])).toContain(60); // the clip at beat 0 plays again
+    stopTransport();
+    expect(ui.songPlayhead).toBe(0); // and stopping returns to the start, not to beat 6
+
+    ui.view = 'pattern';
+    ui.playhead = 7;
+    ui.scrollX = 3;
+    restartTransport();
+    expect([ui.playhead, ui.scrollX]).toEqual([0, 0]);
+  });
+
   it('starting mid-song only plays what’s ahead; the song playhead is separate from the pattern’s', () => {
     curPattern().layers[0].notes = [note(1, 0, 1, 60)];
     S.addClip(project.song.tracks[1].id, curPattern().id, 8);

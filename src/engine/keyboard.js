@@ -3,7 +3,7 @@
  */
 import { ui, modalOpen } from '../stores/ui.js';
 import { undo, redo } from '../stores/history.js';
-import { transport, startTransport, stopTransport } from './transport.js';
+import { transport, startTransport, stopTransport, restartTransport } from './transport.js';
 import { onTapDown, onTapUp, startRecording } from './recorder.js';
 import { pick, pickKeyDown, pickKeyUp, pickBlur } from './pick.js';
 import { ACTIONS, transposeSel } from './editing.js';
@@ -12,10 +12,8 @@ import { deleteSelectedPoint } from './automation.js';
 
 const isField = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA');
 
-export function seekHome() {
-  ui.playhead = 0;
-  ui.scrollX = 0;
-}
+/** Home: back to the beginning (same as the Restart button). */
+export const seekHome = restartTransport;
 
 function onKeyDown(e) {
   if (modalOpen()) return; // the dialog handles its own keys
@@ -73,7 +71,7 @@ function songKeyDown(e) {
   else if (mod && k === 'x') handled(cutSelectedClips);
   else if (mod && k === 'v') handled(() => pasteClips());
   else if (k === 'Delete' || k === 'Backspace') handled(() => (ui.autoSel ? deleteSelectedPoint() : deleteSelectedClips()));
-  else if (k === 'Home') handled(() => { ui.songPlayhead = 0; });
+  else if (k === 'Home') handled(restartTransport);
   else if ((k === 'ArrowLeft' || k === 'ArrowRight') && ui.songSel.size) handled(() => nudgeSelectedClips(k === 'ArrowLeft' ? -1 : 1, mod));
 }
 

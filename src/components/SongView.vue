@@ -10,7 +10,7 @@ import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
 import { clamp } from '../core/music.js';
 import { project, patternById, patternLength, songLength, nid, barLen, beatLen, songRows, orderedTracks, soundById, clipLength, clipTrim, fullClipLength, MIN_CLIP, sortedSections } from '../stores/project.js';
 import { snapRound, snapFloor, formatPosition } from '../core/meter.js';
-import { ui, HEAD_W, saveHeadW } from '../stores/ui.js';
+import { ui, HEAD_W, saveHeadW, toggleHeadCollapsed } from '../stores/ui.js';
 import { takeSnapshot, commitUndo } from '../stores/history.js';
 import { transport, startTransport, currentBeat } from '../engine/transport.js';
 import { addClip, addSoundClip, addSongTrack, removeSongTrack, editPattern, PATTERN_MIME, SOUND_MIME, SONG_SNAPS, songGrid, snapSong, placeGrid, isFine, moveRow, moveRowBy,
@@ -23,11 +23,13 @@ import { useFrameValue } from '../composables/useFrameValue.js';
 import { doubleTapper, recentlyDoubleTapped } from '../composables/touch.js';
 import { device } from '../stores/device.js';
 
-const HEAD = computed(() => (device.narrow ? Math.min(ui.headW, 132) : ui.headW)); // track header column width (px), resizable; narrower on phones
+const COLLAPSED_W = 28; // folded track-header column: just each row's colour
+const HEAD = computed(() => (ui.headCollapsed ? COLLAPSED_W : device.narrow ? Math.min(ui.headW, 132) : ui.headW)); // track header column width (px), resizable; narrower on phones
 const LANE_H = 56;  // row height (px)
 const AUTO_H = 72;  // automation row height (px)
-const RULER_H = 24, SECTIONS_H = 22;
-const TOP_H = RULER_H + SECTIONS_H; // sticky header rows above the first track
+const RULER_H = 24;
+const SECTIONS_H = computed(() => (device.coarse ? 36 : 22)); // the Sections strip: taller for fingers
+const TOP_H = computed(() => RULER_H + SECTIONS_H.value); // sticky header rows above the first track
 
 const song = computed(() => project.song);
 const beatPx = computed(() => ui.barPx / barLen()); // a bar is always barPx wide, whatever its length
@@ -246,7 +248,7 @@ const autoScroll = {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) return; // not laid out
     const speed = (pos, lo, hi) => (pos < lo + EDGE ? -Math.ceil((lo + EDGE - pos) / 3) : pos > hi - EDGE ? Math.ceil((pos - hi + EDGE) / 3) : 0);
-    const vx = speed(d.last.clientX, r.left + HEAD.value, r.right), vy = speed(d.last.clientY, r.top + TOP_H, r.bottom);
+    const vx = speed(d.last.clientX, r.left + HEAD.value, r.right), vy = speed(d.last.clientY, r.top + TOP_H.value, r.bottom);
     if (!vx && !vy) return;
     const x = el.scrollLeft, y = el.scrollTop;
     el.scrollLeft += vx;
@@ -291,12 +293,12 @@ function applyMarquee(e) {
   if (!m.active && Math.abs(x - m.x0) < 4 && Math.abs(y - m.y0) < 4) return; // still a click
   m.active = true;
   m.x1 = Math.max(HEAD.value, x); // not into the header column
-  m.y1 = Math.max(TOP_H, y);
+  m.y1 = Math.max(TOP_H.value, y);
   const box = marqueeBox.value;
   const hit = new Set(m.base);
   rows.value.forEach((r, i) => {
     if (r.kind !== 'track') return;
-    const top = TOP_H + rowTops.value[i];
+    const top = TOP_H.value + rowTops.value[i];
     if (top + LANE_H <= box.top || top >= box.top + box.height) return;
     for (const c of clipsOf(r.item)) {
       const left = HEAD.value + c.start * beatPx.value;
@@ -317,7 +319,7 @@ onUnmounted(onMarqueeUp);
 const marqueeBox = computed(() => {
   const m = marquee.value;
   if (!m) return null;
-  const x0 = Math.max(HEAD.value, m.x0), y0 = Math.max(TOP_H, m.y0);
+  const x0 = Math.max(HEAD.value, m.x0), y0 = Math.max(TOP_H.value, m.y0);
   return { left: Math.min(x0, m.x1), top: Math.min(y0, m.y1), width: Math.abs(m.x1 - x0), height: Math.abs(m.y1 - y0) };
 });
 
@@ -377,6 +379,7 @@ function startSecDrag(e, d) {
 /** Empty strip: drag out a new section. */
 function onStripDown(e) {
   if (e.button !== 0) return;
+  if (e.pointerType === 'touch') return; // a finger scrolls the song; double-tap / long-press the strip to add a section
   const at = Math.max(0, beatAt(e, e.currentTarget));
   const gap = sectionGap(at);
   if (!gap) return;
@@ -386,7 +389,7 @@ function onStripDown(e) {
 function onSectionDown(e, x, side = 'move') {
   if (e.button !== 0 || editingSection.value === x.id) return;
   e.currentTarget.closest?.('.section')?.focus();
-  startSecDrag(e, { mode: side, id: x.id, orig: { start: x.start, end: x.end }, gap: sectionGap(x.start, x.id) || [x.start, x.end] });
+  startSecDrag(e, { mode: side, id: x.id, touch: e.pointerType === 'touch', orig: { start: x.start, end: x.end }, gap: sectionGap(x.start, x.id) || [x.start, x.end] });
 }
 function onSecMove(e) {
   const d = secDrag.value;
@@ -425,9 +428,13 @@ function onSecMove(e) {
     x.end = Math.max(Math.min(hi, snapRound(end + dx / beatPx.value, grid)), start + MIN_CLIP);
   }
 }
-function onSecUp() {
+function onSecUp(e) {
   const d = secDrag.value;
   secDrag.value = null;
+  if (d?.touch && d.mode === 'move' && !d.moved && e?.type === 'pointerup' && dtap(e, `sec${d.id}`)) { // double-tap a section: rename it
+    const x = song.value.sections.find((s) => s.id === d.id);
+    if (x) renameSection(x);
+  }
   const made = d?.mode === 'create' && d.id && song.value.sections.find((s) => s.id === d.id);
   if (made) renameSection(made); // just drawn: type its name
   window.removeEventListener('pointermove', onSecMove);
@@ -435,11 +442,49 @@ function onSecUp() {
   window.removeEventListener('pointercancel', onSecUp);
 }
 onUnmounted(onSecUp);
-/** Double-click empty strip: a 4-bar section from the bar clicked. */
-function onStripDblClick(e) {
-  const at = snapFloor(Math.max(0, beatAt(e, e.currentTarget)), barLen());
-  const x = addSection(at, at + 4 * barLen());
+/** Double-click (or double-tap) empty strip: a 4-bar section from the bar clicked. */
+function onStripDblClick(e) { addSectionAt(beatAt(e, e.currentTarget), 4); }
+function addSectionAt(beat, barsLong) {
+  const at = snapFloor(Math.max(0, beat), barLen());
+  const x = addSection(at, at + barsLong * barLen());
   if (x) renameSection(x);
+  return x;
+}
+const onNativeStripDblClick = (e) => { if (!recentlyDoubleTapped()) onStripDblClick(e); };
+function onStripUp(e) {
+  if (e.pointerType === 'touch' && e.target === e.currentTarget && dtap(e, 'strip')) onStripDblClick(e);
+}
+/** Right-click / long-press the empty strip: add a section there. */
+function onStripContext(e) {
+  e.preventDefault();
+  const beat = beatAt(e, e.currentTarget);
+  const free = !!sectionGap(beat);
+  Object.assign(ui.ctxMenu, {
+    open: true, kind: 'custom', serial: ui.ctxMenu.serial + 1, x: e.clientX, y: e.clientY,
+    items: [
+      { header: `Bar ${Math.floor(Math.max(0, beat) / barLen()) + 1}` },
+      { label: 'Add section here (4 bars)', run: () => addSectionAt(beat, 4), enabled: () => free },
+      { label: 'Add section here (8 bars)', run: () => addSectionAt(beat, 8), enabled: () => free },
+    ],
+  });
+}
+/** Right-click / long-press a section: rename, recolour, delete. */
+function onSectionContext(e, x) {
+  e.preventDefault();
+  Object.assign(ui.ctxMenu, {
+    open: true, kind: 'custom', serial: ui.ctxMenu.serial + 1, x: e.clientX, y: e.clientY,
+    items: [
+      { header: x.name },
+      { label: 'Rename', run: () => renameSection(x) },
+      { label: 'Change colour…', run: () => {
+        const el = document.querySelector(`[data-section="${x.id}"] input[type=color]`);
+        try { if (el?.showPicker) { el.showPicker(); return; } } catch { /* fall back */ }
+        el?.click();
+      } },
+      null,
+      { label: 'Delete section', run: () => removeSection(x.id) },
+    ],
+  });
 }
 function renameSection(x) {
   editingSection.value = x.id;
@@ -505,6 +550,9 @@ function onResizeKey(e) {
   saveHeadW();
 }
 const scroller = ref(null);
+watch(() => ui.songPlayhead, (b) => { // back to the start (Restart / Home): scroll there too
+  if (b === 0 && scroller.value) scroller.value.scrollLeft = 0;
+});
 watch(playhead, (b) => { // keep the playhead on screen while playing
   const el = scroller.value;
   if (!el || !transport.playing) return;
@@ -623,11 +671,13 @@ function onRemoveAutomation(a) {
 </script>
 
 <template>
-  <div class="song-view" :style="{ '--head-w': HEAD + 'px' }" @wheel="onWheel">
+  <div class="song-view" :class="{ collapsed: ui.headCollapsed }" :style="{ '--head-w': HEAD + 'px' }" @wheel="onWheel">
     <div ref="scroller" class="scroller" @pointerdown.self="ui.songSel.clear()">
       <div ref="gridEl" class="grid" :style="{ width: width + 'px' }">
         <div class="ruler-row">
           <div class="corner">
+            <button class="small fold" :aria-expanded="!ui.headCollapsed" :aria-label="ui.headCollapsed ? 'Show track names' : 'Hide track names'"
+              :title="ui.headCollapsed ? 'Show the track names and controls' : 'Fold the track column to just each track’s colour'" @click="toggleHeadCollapsed">{{ ui.headCollapsed ? '»' : '«' }}</button>
             <div class="resizer" role="separator" aria-orientation="vertical" :aria-valuenow="ui.headW"
               :aria-valuemin="HEAD_W.min" :aria-valuemax="HEAD_W.max" aria-label="Track header width" tabindex="0"
               title="Drag to resize the track names column (double-click to reset)"
@@ -638,7 +688,7 @@ function onRemoveAutomation(a) {
               <button class="small" title="Zoom out (Ctrl+wheel)" aria-label="Zoom out" @click="zoom(1 / 1.25)">−</button>
               <button class="small" title="Zoom in (Ctrl+wheel)" aria-label="Zoom in" @click="zoom(1.25)">+</button>
             </span>
-            <label class="snap" title="Where clips can be placed">Snap
+            <label class="snap" title="Where clips can be placed (also in Settings → Editing)"><span class="snap-word">Snap</span>
               <select v-model="ui.songSnap" aria-label="Song snap">
                 <option v-for="o in SONG_SNAPS" :key="o.label" :value="o.value">{{ o.label }}</option>
               </select>
@@ -648,19 +698,20 @@ function onRemoveAutomation(a) {
             <span v-for="b in bars" :key="b" class="bar-label" :style="{ left: (b - 1) * ui.barPx + 'px' }">{{ b }}</span>
           </div>
         </div>
-        <div class="sections-row" :style="{ top: RULER_H + 'px', height: SECTIONS_H + 'px' }">
+        <div class="sections-row" :style="{ top: RULER_H + 'px', height: SECTIONS_H + 'px', '--sec-h': SECTIONS_H + 'px' }">
           <div class="corner sec-corner" title="Mark parts of the song: drag in the strip to the right (or double-click it for 4 bars)">Sections</div>
-          <div class="sections" :class="{ empty: !sections.length }" title="Drag to mark a section of the song (intro, verse, chorus…); double-click for a 4-bar section"
-            @pointerdown.self="onStripDown" @dblclick.self="onStripDblClick">
-            <span v-if="!sections.length" class="sec-hint" :style="{ left: '6px' }">Drag here to mark an intro, verse, chorus…</span>
+          <div class="sections" :class="{ empty: !sections.length }" title="Drag to mark a section of the song (intro, verse, chorus…); double-click for a 4-bar section; right-click for more"
+            @pointerdown.self="onStripDown" @pointerup.self="onStripUp" @dblclick.self="onNativeStripDblClick" @contextmenu.self="onStripContext">
+            <span v-if="!sections.length" class="sec-hint" :style="{ left: '6px' }">{{ device.coarse ? 'Double-tap here to add a section (intro, verse, chorus…)' : 'Drag here to mark an intro, verse, chorus…' }}</span>
             <div v-for="x in sections" :key="x.id" :data-section="x.id" class="section" :class="{ moving: secDrag?.id === x.id }" :style="sectionStyle(x)"
               role="group" tabindex="0" :aria-label="`Section ${x.name}`" :title="sectionTitle(x)"
-              @pointerdown.self="onSectionDown($event, x)" @dblclick.self="renameSection(x)" @keydown="onSectionKey($event, x)">
+              @pointerdown.self="onSectionDown($event, x)" @dblclick.self="!recentlyDoubleTapped() && renameSection(x)" @keydown="onSectionKey($event, x)"
+              @contextmenu="onSectionContext($event, x)">
               <div class="sec-edge start" @pointerdown="onSectionDown($event, x, 'start')"></div>
               <input v-model="x.color" type="color" class="swatch sec-swatch" :aria-label="`Colour of ${x.name}`" title="Section colour" @pointerdown.stop>
               <input v-if="editingSection === x.id" v-model="x.name" class="sec-name" :aria-label="`Name of section ${x.name}`"
                 @pointerdown.stop @blur="finishRename(x)" @keydown.enter.prevent="$event.target.blur()" @keydown.escape.prevent="$event.target.blur()">
-              <span v-else class="sec-label" @pointerdown="onSectionDown($event, x)" @dblclick="renameSection(x)">{{ x.name }}</span>
+              <span v-else class="sec-label" @pointerdown="onSectionDown($event, x)" @dblclick="!recentlyDoubleTapped() && renameSection(x)">{{ x.name }}</span>
               <button class="sec-del" :aria-label="`Delete section ${x.name}`" title="Delete section" @pointerdown.stop @click="removeSection(x.id)">✕</button>
               <div class="sec-edge end" @pointerdown="onSectionDown($event, x, 'end')"></div>
             </div>
@@ -670,6 +721,9 @@ function onRemoveAutomation(a) {
         <template v-for="(r, i) in rows" :key="r.key">
           <div v-if="r.kind === 'track'" :data-row="r.key" class="lane-row" :class="{ dragging: rowDrag?.key === r.key }" :style="{ height: LANE_H + 'px' }">
             <div class="head" :style="{ borderLeftColor: r.item.color }">
+              <button v-if="ui.headCollapsed" class="strip" :style="{ background: r.item.color }" :class="{ off: r.item.mute }"
+                :title="`${r.item.name}${r.item.mute ? ' (muted)' : ''}${r.item.solo ? ' (solo)' : ''} — tap for actions`" :aria-label="`Actions for ${r.item.name}`"
+                @click="openRowActions($event, r, i)"></button>
               <button class="grip" :aria-label="`Move ${r.item.name} (drag, or ↑/↓)`" title="Drag to move this row (or focus and press ↑/↓)"
                 @pointerdown="onGripDown($event, r, i)" @pointermove="onGripMove" @pointerup="onGripUp" @pointercancel="onGripUp" @keydown="onGripKey($event, r)">⠿</button>
               <input v-model="r.item.color" type="color" class="swatch" :aria-label="`Colour of ${r.item.name}`" title="Track colour">
@@ -705,6 +759,9 @@ function onRemoveAutomation(a) {
 
           <div v-else :data-row="r.key" class="lane-row auto-row" :class="{ disabled: r.item.enabled === false, dragging: rowDrag?.key === r.key }" :style="{ height: AUTO_H + 'px' }">
             <div class="head auto-head" :style="{ borderLeftColor: r.item.color }">
+              <button v-if="ui.headCollapsed" class="strip auto" :style="{ background: r.item.color }" :class="{ off: r.item.enabled === false }"
+                :title="`${r.item.name}${r.item.enabled === false ? ' (off)' : ''} — tap for actions`" :aria-label="`Actions for ${r.item.name}`"
+                @click="openRowActions($event, r, i)"></button>
               <div class="line">
                 <button class="grip" :aria-label="`Move ${r.item.name} (drag, or ↑/↓)`" title="Drag to move this row (or focus and press ↑/↓)"
                   @pointerdown="onGripDown($event, r, i)" @pointermove="onGripMove" @pointerup="onGripUp" @pointercancel="onGripUp" @keydown="onGripKey($event, r)">⠿</button>
@@ -773,8 +830,21 @@ function onRemoveAutomation(a) {
 .corner, .head { position: sticky; left: 0; z-index: 2; width: var(--head-w); flex: none; background: var(--panel); border-right: 1px solid var(--line); }
 .ruler-row { position: sticky; top: 0; z-index: 3; height: 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .corner { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 6px 0 8px; color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; z-index: 4; }
-.snap { text-transform: none; letter-spacing: 0; gap: 3px; }
-.snap select { padding: 0 2px; font-size: 11px; }
+.snap { text-transform: none; letter-spacing: 0; gap: 3px; min-width: 0; flex: 0 1 auto; }
+.snap select { padding: 0 2px; font-size: 11px; min-width: 44px; width: 100%; }
+.fold, .zoom { flex: none; }
+.corner-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the corner follows the column's width: drop the title, then the word "Snap", before anything spills into the timeline */
+.ruler-row .corner { container-type: inline-size; }
+@container (max-width: 250px) { .corner-title { display: none; } }
+@container (max-width: 190px) { .snap-word { display: none; } }
+/* a narrow track column (any screen): name + ⋯ menu, as on phones */
+.lane-row .head { container-type: inline-size; }
+@container (max-width: 200px) {
+  .lane-row .head .inline { display: none; }
+  .lane-row .head .actions, .lane-row .head .badge { display: inline-block; }
+  .lane-row .head .swatch { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+}
 .ruler { position: relative; flex: 1; cursor: pointer; }
 .bar-label { position: absolute; top: 0; bottom: 0; padding-left: 4px; border-left: 1px solid var(--line); color: var(--dim); font-size: 11px; line-height: 24px; }
 .head { display: flex; align-items: center; gap: 4px; padding: 0 6px; border-bottom: 1px solid var(--line); border-left: 4px solid; }
@@ -847,7 +917,7 @@ function onRemoveAutomation(a) {
 .sections-row { display: flex; position: sticky; z-index: 3; background: var(--panel); border-bottom: 1px solid var(--line); }
 .sec-corner { font-size: 10px; }
 .sections { position: relative; flex: 1; cursor: crosshair; background: var(--bg); }
-.sec-hint { position: absolute; top: 0; line-height: 22px; font-size: 11px; color: var(--dim); pointer-events: none; white-space: nowrap; }
+.sec-hint { position: absolute; top: 0; line-height: var(--sec-h, 22px); font-size: 11px; color: var(--dim); pointer-events: none; white-space: nowrap; }
 .section { position: absolute; top: 2px; bottom: 2px; display: flex; align-items: center; gap: 3px; padding: 0 6px; border-left: 3px solid; border-radius: 3px;
   overflow: hidden; cursor: grab; touch-action: none; user-select: none; font-size: 11px; font-weight: 600; color: var(--text); }
 .section.moving, .section:active { cursor: grabbing; }
@@ -865,9 +935,8 @@ function onRemoveAutomation(a) {
 .zoom { display: inline-flex; gap: 2px; text-transform: none; letter-spacing: 0; }
 .zoom button { padding: 0 6px; line-height: 1.2; }
 @media (max-width: 760px) {
-  .corner-title, .snap > :not(select) { display: none; }
-  .snap { font-size: 0; } /* just the select */
-  .corner { padding: 0 4px; gap: 3px; }
+  .corner-title, .snap { display: none; } /* phones: song snap lives in Settings → Editing */
+  .corner { padding: 0 4px; gap: 3px; justify-content: flex-start; }
   .head { gap: 2px; padding: 0 3px; }
   /* the colour shows on the left edge; the picker opens from the ⋯ menu */
   .head .swatch { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -878,11 +947,32 @@ function onRemoveAutomation(a) {
 }
 @media (pointer: coarse) {
   .trim { width: 16px; max-width: 34%; }
-  .sec-edge { width: 14px; }
   .head .del, .sec-del { opacity: .6; } /* no hover on a touch screen */
+  /* the taller Sections strip (SECTIONS_H): bigger labels and controls */
+  .section { top: 3px; bottom: 3px; font-size: 13px; gap: 6px; padding: 0 8px; border-left-width: 4px; }
+  .sec-name { height: 26px; min-height: 0; font-size: 13px; }
+  .sec-swatch { width: 16px; height: 16px; min-height: 0; }
+  .sec-del { min-height: 0; padding: 0 6px; font-size: 13px; }
+  .sec-hint { font-size: 12px; }
+  .sec-edge { width: 18px; }
   .clip { -webkit-touch-callout: none; }
   .corner button, .corner select { min-height: 0; } /* the header rows have fixed heights (positions depend on them) */
   .zoom button { min-width: 26px; }
 }
+/* folded track column: only each row's colour (tap it for the row's actions) */
+.fold { flex: none; padding: 0 5px; min-width: 20px; font-weight: 700; }
+.collapsed .corner { padding: 0 3px; justify-content: center; }
+.collapsed .corner > :not(.fold), .collapsed .sec-corner { font-size: 0; }
+.collapsed .corner > :not(.fold) { display: none; }
+.collapsed .head { padding: 0; border-left-width: 0; }
+.collapsed .head > :not(.strip):not(.swatch), .collapsed .auto-head .line > :not(.swatch), .collapsed .auto-head .line:not(:first-of-type) { display: none; }
+.collapsed .head .swatch { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; } /* kept for "Change colour…" */
+.collapsed .auto-head .line { position: absolute; }
+.strip { position: absolute; inset: 3px 4px; padding: 0; border: 0; border-radius: 4px; cursor: pointer; min-height: 0; }
+.strip.auto { background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 3px, transparent 3px 6px) !important; }
+.strip.off { opacity: .35; }
+.strip:focus-visible { outline: 2px solid var(--strong); outline-offset: 1px; }
+.collapsed .add-head { padding: 8px 2px; }
+.collapsed .add-head button { display: none; }
 .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); pointer-events: none; z-index: 1; opacity: .85; }
 </style>

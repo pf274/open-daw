@@ -3,6 +3,7 @@
 import { project, patternLength, barLen } from '../stores/project.js';
 import { newPattern, duplicatePattern, deletePattern, editPattern, clipCount, choosePattern, PATTERN_MIME } from '../engine/song.js';
 import { ui } from '../stores/ui.js';
+import { askConfirm } from '../stores/confirm.js';
 import { device } from '../stores/device.js';
 
 function onDragStart(e, p) {
@@ -10,10 +11,16 @@ function onDragStart(e, p) {
   e.dataTransfer.setData('text/plain', p.name);
   e.dataTransfer.effectAllowed = 'copy';
 }
-function onDelete(p) {
+async function onDelete(p) {
+  if (project.patterns.length === 1) { deletePattern(p.id); return; } // refused, with a message: nothing to confirm
   const n = clipCount(p.id);
-  if (n && !confirm(`Delete "${p.name}"? It is used ${n} time${n === 1 ? '' : 's'} in the song.`)) return;
-  deletePattern(p.id);
+  const ok = await askConfirm({
+    title: `Delete pattern “${p.name}”?`,
+    message: (n ? `It is used ${n} time${n === 1 ? '' : 's'} in the song, and ${n === 1 ? 'that clip' : 'those clips'} will be removed too. ` : 'It isn’t used in the song. ')
+      + 'You can undo this with ↶ (Ctrl+Z).',
+    confirmLabel: 'Delete pattern', danger: true,
+  });
+  if (ok) deletePattern(p.id);
 }
 /** Click a card (not its controls) to select that pattern; Enter on a focused card does the same. */
 function onCardClick(e, p) {

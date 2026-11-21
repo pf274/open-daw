@@ -6,6 +6,7 @@ import { takeSnapshot, commitUndo } from '../stores/history.js';
 import { importSoundFiles, deleteSound, previewSound, soundClipCount, soundState } from '../engine/sounds.js';
 import { SOUND_MIME, chooseSound } from '../engine/song.js';
 import { ui } from '../stores/ui.js';
+import { askConfirm } from '../stores/confirm.js';
 import { device } from '../stores/device.js';
 import { refreshSongMix } from '../engine/transport.js';
 
@@ -20,10 +21,15 @@ function onDragStart(e, s) {
   e.dataTransfer.setData('text/plain', s.name);
   e.dataTransfer.effectAllowed = 'copy';
 }
-function onDelete(s) {
+async function onDelete(s) {
   const n = soundClipCount(s.id);
-  if (n && !confirm(`Delete "${s.name}"? It is used ${n} time${n === 1 ? '' : 's'} in the song.`)) return;
-  deleteSound(s.id);
+  const ok = await askConfirm({
+    title: `Delete sound “${s.name}”?`,
+    message: (n ? `It is used ${n} time${n === 1 ? '' : 's'} in the song, and ${n === 1 ? 'that clip' : 'those clips'} will be removed too. ` : 'It isn’t used in the song. ')
+      + 'You can undo this with ↶ (Ctrl+Z).',
+    confirmLabel: 'Delete sound', danger: true,
+  });
+  if (ok) deleteSound(s.id);
 }
 /* volume slider: one undo step per adjustment */
 let volSnap = null;

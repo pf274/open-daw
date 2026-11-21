@@ -1,6 +1,7 @@
 /** Editor/session state that is NOT part of the saved document. */
 import { reactive } from 'vue';
 import { curTrack } from './project.js';
+import { confirmState } from './confirm.js';
 
 /** A remembered on/off preference (per browser); falls back to `def` when storage is unavailable. */
 export function loadPref(key, def) {
@@ -48,6 +49,7 @@ export const ui = reactive({
   songSel: new Set(), // selected clip ids
   barPx: 72,          // song view zoom: pixels per bar
   headW: loadHeadW(), // song view: width of the track-header column (px), resizable
+  headCollapsed: loadHeadCollapsed(), // song view: track-header column folded to colour strips
   songSnap: 1,        // song view grid: 'bar', or counted beats (1, ½, ¼); 0 = off
   autoSel: null,      // selected automation point: { id (automation track), index }
   placeSound: null,   // a sound picked in the list (or as a clip): double-clicking empty space places it instead of the pattern
@@ -68,6 +70,14 @@ export const ui = reactive({
 function loadThemePref() {
   try { const v = localStorage.getItem('open-daw-theme'); return v === 'light' || v === 'dark' ? v : 'system'; }
   catch { return 'system'; }
+}
+
+function loadHeadCollapsed() {
+  try { return localStorage.getItem('open-daw-head-collapsed') === 'true'; } catch { return false; }
+}
+export function toggleHeadCollapsed() {
+  ui.headCollapsed = !ui.headCollapsed;
+  try { localStorage.setItem('open-daw-head-collapsed', String(ui.headCollapsed)); } catch { /* per-viewer convenience only */ }
 }
 
 function loadHeadW() {
@@ -96,7 +106,7 @@ export function setTab(t) {
 }
 
 /** True while a modal dialog owns the keyboard. */
-export const modalOpen = () => ui.tremorModal.open || ui.quantizeModal.open || ui.synthModal.open;
+export const modalOpen = () => ui.tremorModal.open || ui.quantizeModal.open || ui.synthModal.open || confirmState.open;
 
 export function status(msg, warn = false) {
   ui.status.msg = msg;

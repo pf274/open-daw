@@ -16,7 +16,7 @@ npm run build      # static production build in dist/
 
 ## Workflow
 
-1. **🎤 Mic**, then whistle. The readout shows the detected note and what it maps to after transposition.
+1. **Settings → Input & pick mode → 🎤 Mic**, then whistle. The readout next to it shows the detected note and what it maps to after transposition. (You can skip this step: **● Rec** switches the mic on by itself.)
 2. Pick a layer, set the playhead (click the ruler), press **● Rec** or `R`.
 3. After the count-in, whistle and **tap any key once per note**. `Esc` stops.
 4. Tap times set the rhythm. Each note's pitch is the median whistled pitch in a short window around its tap.
@@ -33,9 +33,10 @@ If notes come out wrong, change the **Settings → Whistle alignment** options a
 
 Everything you write in the note editor belongs to a **pattern**: a set of instrument layers with their notes, such as "Verse", "Chorus" or "Fill". The **Song view** arranges patterns into a song, so you can repeat and mix sections without copying notes.
 
-Switch views with **🎼 Song** / **🎹 <pattern name>** in the header.
+To open a pattern in the editor, press **Edit** on it in the Song view's side panel, double-click one of its clips, or right-click a clip → **Edit pattern**. **🎼 Song** in the header takes you back to the arrangement.
 
 **Song view**
+- **Fold the track column** with **«** in its top-left corner to see more of the song: each row shrinks to a strip of its colour (striped for automation, faded when muted or switched off). Click a strip for that row's actions (mute, solo, colour, move, delete). **»** brings the names back, and the folded state is remembered in this browser. When the column is narrow, each row shows just its name and a **⋯** actions button, as on phones.
 - **Tracks** are the rows. Name each one on the left and click the round swatch to colour it. **M**/**S** mute and solo a track, ✕ (shown when you're on the row) removes it, and **+ Add track** adds one. Drag the divider at the right of the **Tracks** header to widen the names column (←/→ when focused; double-click resets); the width is remembered in this browser.
 - **Rearrange rows**, pattern tracks and automation tracks alike: drag a row's **⠿** grip up or down (a line shows where it will land), or focus the grip and press **↑/↓**. So you can put an automation row right under the track it controls. Moves are undoable and saved.
 - **Patterns** are listed on the left. **Click** one to select it (Enter works too), then **double-click** an empty spot on a track to place it, or **drag** it onto a track. It snaps to the **song snap**, 1 beat by default; change it in the Song view's top-left corner or in Settings (1 bar, 1 beat, ½ beat, ¼ beat, or off). Beats follow the time signature: eighth notes in 6/8, and three per bar in 3/4. Lanes and the ruler show a line for each beat. Double-click places the pattern you selected most recently: the one you clicked in the list, or the one whose clip you last clicked on the timeline. Each pattern shows its length and how often it's used.
@@ -47,9 +48,9 @@ Switch views with **🎼 Song** / **🎹 <pattern name>** in the header.
   - **Ctrl+C / Ctrl+X / Ctrl+V** copy, cut and paste clips. Paste puts them at the song playhead on the same tracks, then moves the playhead to the end of the pasted block, so pressing Ctrl+V again lays another copy right after. Right-click an empty spot on a track for **Paste here**, which pastes at that spot starting on that track.
   - **Double-click** a clip, or press **Edit** in the pattern list, to open its pattern in the editor. Editing a pattern changes every clip of it.
   - Right-click a clip for **Make unique**, which gives that clip its own copy of the pattern so you can vary one occurrence.
-- **Sections** label parts of the song (intro, verse, chorus, bridge…) in the strip under the ruler. Drag across the strip to mark one, or double-click it for 4 bars, then type a name. New sections are named Intro, Verse, Chorus… in a typical order. Each one lightly tints the lanes below it in its colour (click the small swatch to change it). Drag a section to move it, drag its edges to resize it, and double-click its name (or press Enter) to rename it. ✕ or Delete removes it. Sections can't overlap. They are saved with the project and can be undone.
-- **▶ Play** (Space) plays the song from the song playhead; click the ruler to move it (to the nearest grid line). Ctrl+wheel zooms. The pattern editor keeps its own playhead.
-- Recording happens in the pattern editor, so Rec and Tap rhythm are disabled in the Song view.
+- **Sections** label parts of the song (intro, verse, chorus, bridge…) in the strip under the ruler. Drag across the strip to mark one, or double-click it for 4 bars, then type a name. New sections are named Intro, Verse, Chorus… in a typical order. Each one lightly tints the lanes below it in its colour (click the small swatch to change it). Drag a section to move it, drag its edges to resize it, and double-click its name (or press Enter) to rename it. ✕ or Delete removes it. Right-click the strip for **Add section here** (4 or 8 bars), or right-click a section for Rename, Change colour… and Delete. On a touch screen, **double-tap** the strip to add a 4-bar section (a swipe scrolls the song), **long-press** the strip or a section for those menus, and double-tap a section to rename it. Sections can't overlap. They are saved with the project and can be undone.
+- **▶ Play** (Space) plays the song from the song playhead; click the ruler to move it (to the nearest grid line). **⏮ Restart** (Home) moves the playhead back to the beginning and scrolls there. If the song is playing, it keeps playing from the start. In the pattern editor it does the same for the pattern. Ctrl+wheel zooms. The pattern editor keeps its own playhead.
+- Recording happens in the pattern editor, so the Rec and Tap rhythm buttons only appear there.
 
 **Sound effects**: put audio files (WAV, MP3, OGG, FLAC, M4A… anything your browser can decode, up to 50 MB each) on the song timeline.
 - **+ Import sound…** under **Sounds** in the Song view sidebar adds files to the project. You can also **drop audio files from your computer** straight onto a track: they're imported and placed one after another from the drop point.
@@ -249,7 +250,7 @@ The editor has two tabs: **Sound** (oscillators, envelope, vibrato, output) and 
 
 ## Layout
 
-- **Header:** tabs on the left, then the always-visible controls: Rec, Tap rhythm, Play, Stop, Loop, BPM, Click, Mic (with level meter and live note), Undo/Redo.
+- **Header:** tabs on the left, then the controls: 🎼 Song, Rec, Tap rhythm and Loop (pattern editor only), Play, Stop, Restart, Metronome, Undo/Redo, theme. Tempo (**BPM**) is in **Settings → Time**, and the **🎤 Mic** switch (with level meter and live note) is in **Settings → Input & pick mode**.
   - **File tab:** New, Open…, Save, Export MIDI, Export WAV.
   - **Settings tab:** Time (time signature), Playback (song transpose, count-in, volume), Editing (note snap, song snap, new-note velocity, key, scale), Whistle alignment (note length, pitch window, tap offset, whistle transpose, clarity, trace, Re-align), Input & pick mode (mic device, confirm hold, live drum pads).
   - Click the open tab again to collapse the panel and give the roll more room. The choice is remembered in this browser.
