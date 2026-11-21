@@ -14,6 +14,7 @@ import { setSongTranspose, setTimeSig } from '../engine/editing.js';
 import { SONG_SNAPS } from '../engine/song.js';
 import { pianoSamples } from '../engine/samples.js';
 import { THEMES, setTheme } from '../stores/theme.js';
+import { install, promptInstall, isIOS } from '../stores/install.js';
 import { TIME_SIG_PRESETS, DENOMINATORS, formatTimeSig, parseTimeSig } from '../core/meter.js';
 
 const UNIT_NAMES = { 2: 'half', 4: 'quarter', 8: 'eighth', 16: 'sixteenth' };
@@ -158,6 +159,12 @@ function realign() {
           <option v-for="t in THEMES" :key="t.value" :value="t.value">{{ t.label }}</option>
         </select>
       </label>
+    </fieldset>
+
+    <fieldset v-if="!install.installed && (install.canPrompt || isIOS())">
+      <legend>App</legend>
+      <button v-if="install.canPrompt" title="Add OpenDAW to your home screen or app list; it opens in its own window and works offline" @click="promptInstall">Install app</button>
+      <p v-else class="help">To install: tap Share, then <b>Add to Home Screen</b>.</p>
     </fieldset>
 
     <fieldset>

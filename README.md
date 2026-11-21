@@ -4,6 +4,8 @@ Whistle the pitch, tap the rhythm on any key, get MIDI.
 
 **Try it:** https://pf274.github.io/open-daw/ (every push to `main` is tested and published there by GitHub Actions; see `.github/workflows/deploy.yml`).
 
+**Install it as an app:** OpenDAW is a progressive web app. In Chrome or Edge (desktop or Android), use **Settings → App → Install app** or the install icon in the address bar. On an iPhone or iPad, tap Share → **Add to Home Screen**. The installed app opens in its own window and starts without a connection; instrument samples work offline once they've been played. A service worker (`pwa/sw.js`, written into the build with its file list by the plugin in `vite.config.js`) caches the app, and each new version is picked up the next time you open it online.
+
 ## Run
 
 ```sh
