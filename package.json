@@ -1,0 +1,24 @@
+{
+  "name": "open-daw",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Whistle the pitch, tap the rhythm, get MIDI.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.6.0",
+    "happy-dom": "^15.11.7",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,0 +1,2 @@
+- [ ] Add a reverb effect for individual instruments and as automation tracks
+- [ ] Add automation tracks. Each automation track can correspond to one or more rows in the song view. Automation tracks have one effect, and let the user change the value using a horizontal bezier curve in the timeline. Automation tracks appear as rows alongside the pattern-based tracks.

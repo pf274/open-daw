@@ -1,0 +1,155 @@
+<script setup>
+import { computed } from 'vue';
+import { SCALES } from '../core/scales.js';
+import { NOTE_NAMES, clamp, transposeLabel } from '../core/music.js';
+import { project, curTrack } from '../stores/project.js';
+import { ui, status } from '../stores/ui.js';
+import { pushUndo } from '../stores/history.js';
+import { SNAP_OPTIONS } from '../stores/options.js';
+import { applyTake } from '../engine/recorder.js';
+import { enableMic } from '../engine/mic.js';
+import { setSongTranspose, setTimeSig } from '../engine/editing.js';
+import { SONG_SNAPS } from '../engine/song.js';
+import { pianoSamples } from '../engine/samples.js';
+import { TIME_SIG_PRESETS, DENOMINATORS, formatTimeSig, parseTimeSig } from '../core/meter.js';
+
+const UNIT_NAMES = { 2: 'half', 4: 'quarter', 8: 'eighth', 16: 'sixteenth' };
+const tsPreset = computed(() => (TIME_SIG_PRESETS.includes(formatTimeSig(project.timeSig)) ? formatTimeSig(project.timeSig) : 'custom'));
+function onPreset(e) {
+  if (e.target.value !== 'custom') setTimeSig(parseTimeSig(e.target.value));
+}
+
+// project.settings is replaced on load, so always go through it (never cache it)
+const SCALE_NAMES = Object.keys(SCALES);
+const transposeOptions = computed(() => {
+  const root = +project.settings.scaleRoot || 0;
+  return Array.from({ length: 25 }, (_, i) => i - 12).map((t) => ({ value: t, label: t === 0 ? '0 (off)' : transposeLabel(t, root) }));
+});
+
+// [settings key, label, tooltip, input attrs]
+const ALIGN_FIELDS = [
+  ['fixedBeats', 'Fixed length (beats)', 'Note length in "fixed" mode', { step: 0.125, min: 0.0625 }],
+  ['gapMs', 'Legato gap (ms)', 'Gap left before the next note in "until next tap" mode', { step: 5, min: 0 }],
+  ['winStart', 'Pitch window start (ms)', 'Pitch window starts this far from the tap (negative = before)', { step: 10 }],
+  ['winLen', 'Pitch window length (ms)', 'How long after the tap to sample the whistled pitch', { step: 10, min: 20 }],
+  ['tapShift', 'Tap offset (ms)', 'Shift all tap times (compensates for keyboard/output latency)', { step: 5 }],
+  ['transpose', 'Whistle transpose', 'Applied when turning whistling into notes; −12 drops it an octave', { step: 1 }],
+  ['minClarity', 'Min pitch clarity', 'Pitch frames below this confidence are ignored', { step: 0.05, min: 0, max: 1 }],
+];
+
+function onCountIn(e) { ui.countIn = clamp(Math.round(+e.target.value) || 0, 0, 16); e.target.value = ui.countIn; }
+const onDevice = () => { if (ui.mic.on) enableMic(); };
+
+function realign() {
+  const tr = curTrack();
+  if (!tr.take) { status('This layer has no recorded take to re-align.', true); return; }
+  pushUndo();
+  const res = applyTake(tr, tr.take);
+  status(`Re-aligned: ${res.notes.length} notes` + (res.skipped ? `, ${res.skipped} tap(s) without pitch` : '') + '.');
+}
+</script>
+
+<template>
+  <div class="settings">
+    <fieldset>
+      <legend>Time</legend>
+      <label title="Common time signatures">Time signature
+        <select :value="tsPreset" aria-label="Time signature preset" @change="onPreset">
+          <option v-for="p in TIME_SIG_PRESETS" :key="p" :value="p">{{ p }}</option>
+          <option v-if="tsPreset === 'custom'" value="custom">{{ formatTimeSig(project.timeSig) }}</option>
+        </select>
+      </label>
+      <label title="Beats per measure (the top number)">Beats per bar
+        <input type="number" min="1" max="16" :value="project.timeSig.num" aria-label="Beats per bar"
+          @change="setTimeSig({ ...project.timeSig, num: +$event.target.value })"></label>
+      <label title="Which note value counts as one beat (the bottom number)">Beat unit
+        <select :value="project.timeSig.den" aria-label="Beat unit" @change="setTimeSig({ ...project.timeSig, den: +$event.target.value })">
+          <option v-for="d in DENOMINATORS" :key="d" :value="d">{{ d }} ({{ UNIT_NAMES[d] }})</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Playback</legend>
+      <label>Song transpose
+        <select :value="project.transpose" :class="{ on: project.transpose }"
+          title="Playback and export are shifted; notes stay as written. Drums are never transposed."
+          @change="setSongTranspose(+$event.target.value)">
+          <option v-for="o in transposeOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label>Count-in <input type="number" min="0" max="16" step="1" :value="ui.countIn" @change="onCountIn"> beats</label>
+      <label>Volume <input v-model.number="ui.masterVol" type="range" min="0" max="1" step="0.01"></label>
+      <label title="Piano layers play recordings of a real grand piano (the free FluidR3 GM set, ~25 KB per note, downloaded as needed). Off, or when offline, a modelled piano is used.">
+        <input v-model="project.settings.sampledPiano" type="checkbox"> Recorded piano
+        <small v-if="project.settings.sampledPiano && pianoSamples.loading" class="note">loading…</small>
+        <small v-else-if="project.settings.sampledPiano && pianoSamples.failed" class="note warn">offline: using the modelled piano</small>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Editing</legend>
+      <label title="Note grid in the pattern editor">Note snap
+        <select v-model.number="ui.snap">
+          <option v-for="o in SNAP_OPTIONS" :key="o.label" :value="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label title="Where clips and automation points can be placed in the Song view: a whole bar, or beats of the time signature">Song snap
+        <select v-model="ui.songSnap">
+          <option v-for="o in SONG_SNAPS" :key="o.label" :value="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label title="Velocity for new notes">New-note velocity <input v-model.number="project.settings.vel" type="number" min="1" max="127"></label>
+      <label>Key
+        <select v-model.number="project.settings.scaleRoot">
+          <option v-for="(n, i) in NOTE_NAMES" :key="n" :value="i">{{ n }}</option>
+        </select>
+      </label>
+      <label title="Snaps whistled pitches (and 'Snap to scale') to this scale">Scale
+        <select v-model="project.settings.scale">
+          <option v-for="n in SCALE_NAMES" :key="n" :value="n">{{ n }}</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset class="wide">
+      <legend>Whistle alignment</legend>
+      <label title="How a note's length is decided">Note length
+        <select v-model="project.settings.durMode">
+          <option value="legato">until next tap</option>
+          <option value="hold">key hold time</option>
+          <option value="fixed">fixed</option>
+        </select>
+      </label>
+      <label v-for="[key, label, tip, attrs] in ALIGN_FIELDS" :key="key" :title="tip">
+        {{ label }} <input v-model.number="project.settings[key]" type="number" v-bind="attrs">
+      </label>
+      <label><input v-model="ui.showTrace" type="checkbox"> Show whistle trace &amp; taps</label>
+      <button title="Rebuild the selected layer's notes from its last take using these settings (replaces notes in the take's range; undoable)" @click="realign">Re-align last take</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Input &amp; pick mode</legend>
+      <label>Mic input
+        <select v-model="ui.mic.deviceId" @change="onDevice">
+          <option value="">default</option>
+          <option v-for="d in ui.mic.devices" :key="d.id" :value="d.id">{{ d.label }}</option>
+        </select>
+      </label>
+      <label title="Pick mode: hold a key this long to confirm the note and advance">Confirm hold
+        <input v-model.number="project.settings.holdMs" type="number" step="50" min="100"> ms</label>
+      <label title="On drum layers, Tap rhythm plays and records each drum live instead of tapping first and picking drums afterwards">
+        <input v-model="project.settings.livePads" type="checkbox"> Live drum pads (one pass)</label>
+    </fieldset>
+  </div>
+</template>
+
+<style scoped>
+.settings { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+fieldset { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px 8px; margin: 0; min-width: 0; }
+fieldset.wide { flex: 1 1 520px; }
+legend { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 0 4px; }
+select { max-width: 170px; }
+.note { color: var(--dim); }
+.note.warn { color: var(--warn); }
+</style>
