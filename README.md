@@ -2,6 +2,8 @@
 
 Whistle the pitch, tap the rhythm on any key, get MIDI.
 
+**Try it:** https://pf274.github.io/open-daw/ (every push to `main` is tested and published there by GitHub Actions; see `.github/workflows/deploy.yml`).
+
 ## Run
 
 ```sh
