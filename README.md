@@ -30,6 +30,7 @@ If notes come out wrong, change the options under **Settings → Recording** and
 - *Tap offset*: shifts every tap (latency compensation).
 - *Whistle / hum*: humming and singing are much lower than whistling (about 65–1000 Hz instead of 400–4500 Hz), so **hum or sing** makes the pitch detector listen lower. Each mode has its own transpose: whistling sits around C5–C7 and the default −12 drops it an octave, while a hum stays where you sing it (0). A take remembers which mode it was recorded in, so re-aligning keeps the right transpose.
 - *Min pitch clarity*: raise it if breath or noise turns into wrong notes, lower it if notes are missed.
+- *Record at … BPM* (**Settings → Recording**): record at your own tempo, for example slower for fast passages. While you record with ● Rec or 🥁 Tap rhythm, the playback, metronome and count-in all run at that tempo; the notes are placed by beat, so they land in place when the song plays at its own tempo. Ticking it starts at ¾ of the song's tempo.
 - **Settings → Key & scale** snaps recorded pitches to a scale in a key (major, minor, pentatonic, blues, dorian, mixolydian), or to notes you pick yourself with **custom (pick notes)**. Choosing custom starts from the scale you were on, so you can add or remove single notes. **Chromatic** means no snapping. *Snap to scale* in the note menu uses the same notes.
 
 ## Patterns and the Song view

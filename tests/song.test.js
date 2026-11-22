@@ -416,6 +416,35 @@ describe('tapping rhythm', () => {
     expect(curPattern().layers[0].notes.map((n) => n.id)).toEqual([1, 2]); // one undo step (undo restores fresh layer objects)
   });
 
+  it('a recording tempo slows the count-in and playback, and the notes still land on the song\'s beats', async () => {
+    const { startRecording } = await import('../src/engine/recorder.js');
+    const { exitPick } = await import('../src/engine/pick.js');
+    const tr = curPattern().layers[0];
+    tr.notes = [note(1, 6, 1, 67)];
+    ui.view = 'pattern';
+    project.bpm = 100;
+    project.settings.recTempo = 50; // half speed: 1200 ms per beat
+    ui.countIn = 4;
+    ui.playhead = 4;
+    clock.t = 0;
+    await startRecording(true);
+    expect(ui.status.msg).toMatch(/^50 BPM \(song: 100\)/);
+    voices.length = 0;
+    clock.t = 0.15 + 4 * 1.2 + 2 * 1.2 - 0.1; // just before beat 6, at half speed
+    schedule();
+    expect(voices.find((v) => v[2] === 67)?.[3]).toBeCloseTo(0.15 + 6 * 1.2, 3); // the layer plays at the slower tempo
+    const T0 = 150 + 4 * 1200;
+    await tapAt(T0); await tapAt(T0 + 1200); await tapAt(T0 + 1800); // beats 4, 5, 5.5
+    stopTransport();
+    expect(tr.notes.map((n) => +n.start.toFixed(3))).toEqual([4, 5, 5.5, 6]);
+    expect(project.bpm).toBe(100); // the song's tempo is untouched
+    exitPick();
+    project.settings.recTempo = 0;
+    clock.t = 0;
+    startTransport(0);
+    stopTransport();
+  });
+
   it('count-in taps before the start of the pattern are left out, with a note saying so', async () => {
     const { startRecording } = await import('../src/engine/recorder.js');
     const { exitPick } = await import('../src/engine/pick.js');

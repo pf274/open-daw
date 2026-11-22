@@ -29,6 +29,7 @@ export const transport = reactive({ playing: false, recording: false, rhythmOnly
 /** Internal scheduler state (non-reactive). */
 export const tp = {
   anchors: [], ptr: 0, timer: null, startBeat: 0, countInEnd: 0,
+  bpm: 100,       // tempo of this play: the song's, or the recording tempo while recording
   target: null,   // track being recorded into
   stopAt: null,   // auto-stop beat (phrase preview)
   onStop: null,
@@ -46,6 +47,15 @@ export const transportHooks = {
 /** Tapping rhythm on a drum layer: passes add up and may loop. */
 export const drumOverdub = () => transport.recording && transport.rhythmOnly && isDrum(tp.target);
 
+/**
+ * Tempo while recording (● Rec and 🥁 Tap rhythm): settings.recTempo when set (e.g. slower, for fast
+ * passages), else the song's. Takes are timed in beats at this tempo, so the notes land in place at any tempo.
+ */
+export const recordingBpm = () => {
+  const t = +project.settings.recTempo;
+  return t >= 30 && t <= 300 ? t : project.bpm;
+};
+
 /** @param opts.song  play the arrangement instead of the current pattern (default: the Song view is open) */
 export function startTransport(fromBeat, { record = false, rhythmOnly = false, stopAt = null, onStop = null, song = ui.view === 'song' } = {}) {
   const actx = ensureAudio();
@@ -53,7 +63,8 @@ export function startTransport(fromBeat, { record = false, rhythmOnly = false, s
   if (song) record = false; // recording happens in the pattern editor
   transport.mode = song ? 'song' : 'pattern';
   applyMix();
-  const spb = 60 / project.bpm;
+  tp.bpm = record ? recordingBpm() : project.bpm;
+  const spb = 60 / tp.bpm;
   const countIn = record ? ui.countIn * beatLen() : 0; // count-in is in counted beats (eighths in 6/8)
   const b0 = fromBeat - countIn;
   const t0 = actx.currentTime + 0.15;
@@ -69,7 +80,7 @@ export function startTransport(fromBeat, { record = false, rhythmOnly = false, s
   transport.rhythmOnly = record && rhythmOnly;
   if (record) {
     // performance.now() at which the user *hears* beat `fromBeat`
-    transportHooks.onRecordStart?.({ t0Perf: perfAtCtx(t0 + countIn * spb) + outLat() * 1000, bpm: project.bpm });
+    transportHooks.onRecordStart?.({ t0Perf: perfAtCtx(t0 + countIn * spb) + outLat() * 1000, bpm: tp.bpm }); // the take is timed at this tempo
     if (typeof document !== 'undefined') document.activeElement?.blur?.();
   }
   tp.timer = setInterval(schedule, 25);
@@ -110,7 +121,7 @@ export function restartTransport() {
 export function schedule() {
   if (!transport.playing) return;
   const actx = getCtx();
-  const spb = 60 / project.bpm;
+  const spb = 60 / tp.bpm;
   const horizon = actx.currentTime + 0.2;
   const loopOn = transport.mode === 'pattern' && ui.loop && (!transport.recording || drumOverdub()) && ui.loopEnd > ui.loopStart + 0.01;
   for (let guard = 0; guard < 64; guard++) {
@@ -162,7 +173,7 @@ function scheduleSongRange(b0, b1, at, spb, segStart) {
 export function beatAtCtx(t) {
   let a = tp.anchors[0];
   for (const x of tp.anchors) if (x.t <= t) a = x;
-  return a.beat + ((t - a.t) * project.bpm) / 60;
+  return a.beat + ((t - a.t) * tp.bpm) / 60;
 }
 
 /** Beat the user was *hearing* at performance time p (handles loop wraps). */

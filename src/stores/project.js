@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS = {
   minClarity: 0.7,
   vel: 96,
   holdMs: 750,         // pick mode: hold this long to confirm
+  recTempo: 0,         // BPM while recording (0 = the song's tempo)
   livePads: false,     // drum layers: play pads live while tapping
   sampledPiano: true,  // piano layers use recorded samples (downloaded per note)
 };

@@ -13,7 +13,7 @@ import { inputMode } from '../core/voice.js';
 import { project, curTrack, isDrum, nid, setTake } from '../stores/project.js';
 import { ui, status } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
-import { transport, transportHooks, tp, startTransport, stopTransport, drumOverdub, beatAtPerf } from './transport.js';
+import { transport, transportHooks, tp, startTransport, stopTransport, drumOverdub, beatAtPerf, recordingBpm } from './transport.js';
 import { setPitchSink, isMicOn, enableMic } from './mic.js';
 import { trackBus } from './mix.js';
 import { pick, enterPick, exitPick } from './pick.js';
@@ -143,15 +143,16 @@ export async function startRecording(rhythmOnly) {
   if (!rhythmOnly && !isMicOn() && !(await enableMic())) return;
   const tr = curTrack();
   startTransport(ui.playhead, { record: true, rhythmOnly });
-  status(
+  const slow = recordingBpm() !== project.bpm ? `${recordingBpm()} BPM (song: ${project.bpm}) ·` : ''; // recording at its own tempo
+  status(slow.trim() + (slow ? ' ' : '') + (
     rhythmOnly && isDrum(tr) && project.settings.livePads
       ? `Live drum pads (${bankLabel()}, Z/X switch banks): ${padHelp()} · Space kick. Esc when done.`
       : rhythmOnly && isDrum(tr)
       ? `Tapping drum rhythm into "${tr.name}" — tap any key on each hit, Esc when done. Then pick each drum.`
       : rhythmOnly
       ? `Tapping rhythm into "${tr.name}" — tap any key on each note, Esc when done. Then pick pitches.`
-      : `Recording into "${tr.name}" — ${inputMode(project.settings) === 'hum' ? 'hum or sing' : 'whistle'} and tap any key on each note. Esc to stop.`,
-  );
+      : `Recording into "${tr.name}" — ${inputMode(project.settings) === 'hum' ? 'hum or sing' : 'whistle'} and tap any key on each note. Esc to stop.`
+  ));
 }
 
 // Holds app state: hot-swapping this module would leave stale copies in memory

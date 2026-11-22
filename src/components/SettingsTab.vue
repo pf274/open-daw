@@ -62,6 +62,21 @@ function toggleNote(pc) {
 }
 const scaleSummary = computed(() => scaleNotes(project.settings).map((pc) => NOTE_NAMES[pc]).join(' '));
 
+/* recording tempo: off = the song's; on = its own (starts at ¾ speed) */
+const recTempoOn = computed(() => +project.settings.recTempo >= 30);
+function toggleRecTempo(e) {
+  project.settings.recTempo = e.target.checked ? clamp(Math.round(project.bpm * 0.75), 30, 300) : 0;
+}
+function onRecTempo(e) {
+  const v = clamp(Math.round(+e.target.value) || project.bpm, 30, 300);
+  project.settings.recTempo = v;
+  e.target.value = v;
+}
+const recTempoNote = computed(() => {
+  const r = +project.settings.recTempo / project.bpm;
+  return Math.abs(r - 1) < 0.005 ? 'same as the song' : `${Math.round(r * 100)}% of ${project.bpm}`;
+});
+
 /* whistle or hum: each has its own transpose */
 const tKey = computed(() => transposeKey(project.settings));
 const humming = computed(() => project.settings.inputMode === 'hum');
@@ -177,7 +192,7 @@ function realign() {
 
     <fieldset class="wide">
       <legend>Recording</legend>
-      <p class="hint"><b>● Rec</b> turns what you whistle or hum into notes, one per tap. <b>🥁 Tap rhythm</b> uses the count-in and the note-length settings, but not the mic.</p>
+      <p class="hint"><b>● Rec</b> turns what you whistle or hum into notes, one per tap. <b>🥁 Tap rhythm</b> uses the recording tempo, count-in and note-length settings, but not the mic.</p>
       <label title="What ● Rec listens for. Humming and singing are lower than whistling, so the pitch detector listens to a lower range.">I'll be
         <select v-model="project.settings.inputMode" aria-label="Recording input">
           <option v-for="(m, k) in INPUT_MODES" :key="k" :value="k">{{ m.label.toLowerCase() }}</option>
@@ -197,6 +212,13 @@ function realign() {
       <label :title="humming ? 'Semitones added to hummed pitches. 0 keeps them where you sing them; +12 raises them an octave.' : 'Semitones added to whistled pitches. Whistling sounds about an octave above the note you mean, so −12 brings it down.'">
         {{ humming ? 'Hum transpose' : 'Whistle transpose' }}
         <input v-model.number="project.settings[tKey]" type="number" step="1" min="-36" max="36" :aria-label="humming ? 'Hum transpose' : 'Whistle transpose'"> semitones</label>
+      <span class="rec-tempo" title="Play, click and count in at another tempo while you record (● Rec and 🥁 Tap rhythm), e.g. slower for fast passages. The notes still land in place at the song's tempo.">
+        <label><input type="checkbox" :checked="recTempoOn" aria-label="Own recording tempo" @change="toggleRecTempo"> Record at</label>
+        <input type="number" min="30" max="300" step="1" :value="recTempoOn ? project.settings.recTempo : project.bpm" :disabled="!recTempoOn"
+          aria-label="Recording tempo" @change="onRecTempo"> BPM
+        <small v-if="recTempoOn" class="note">{{ recTempoNote }}</small>
+        <small class="help-text">Slower (or faster) while recording; playback stays at the song's {{ project.bpm }} BPM.</small>
+      </span>
       <label title="Clicks played before recording starts (● Rec and 🥁 Tap rhythm); tapping rhythm already counts taps during it">Count-in
         <input type="number" min="0" max="16" step="1" :value="ui.countIn" aria-label="Count-in" @change="onCountIn"> beats</label>
 
@@ -272,6 +294,8 @@ select { max-width: 170px; }
 .sub h4 span { color: var(--dim); font-weight: normal; }
 .notes { display: inline-flex; flex-wrap: wrap; gap: 3px; }
 .note-btn { min-width: 34px; }
+.rec-tempo { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+@media (pointer: coarse) { .rec-tempo .help-text { display: block; } }
 .note-btn.black:not(.on) { background: var(--panel); }
 /* the help under a field: on touch screens (no tooltips); with a mouse it's the tooltip */
 .help-text { display: none; flex-basis: 100%; color: var(--dim); font-size: 11px; line-height: 1.35; }

@@ -91,6 +91,18 @@ describe('App (mounted)', () => {
     await tr.setValue('12');
     expect(project.settings.humTranspose).toBe(12);
     expect(project.settings.transpose).toBe(-12); // whistling keeps its own
+    const rt = panel().find('input[aria-label="Recording tempo"]');
+    expect(rt.attributes('disabled')).toBeDefined(); // off: the song's tempo
+    project.bpm = 120;
+    await panel().find('input[aria-label="Own recording tempo"]').setValue(true);
+    expect(project.settings.recTempo).toBe(90); // starts at ¾ speed
+    expect(panel().text()).toContain('75% of 120');
+    await rt.setValue('500');
+    await rt.trigger('change');
+    expect(project.settings.recTempo).toBe(300); // clamped
+    await panel().find('input[aria-label="Own recording tempo"]').setValue(false);
+    expect(project.settings.recTempo).toBe(0);
+    project.bpm = 100;
     Object.assign(project.settings, { inputMode: 'whistle', humTranspose: 0, scale: 'chromatic', scaleRoot: 0 });
     await tab(w, 'Settings').trigger('click');
   });
