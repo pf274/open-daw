@@ -13,6 +13,7 @@ import {
 } from '../stores/project.js';
 import { ui, status } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
+import { askText } from '../stores/confirm.js';
 import { silenceAll } from '../audio/mixer.js';
 import { getCtx, withContext, buildMasterChain } from '../audio/context.js';
 import { stopTransport } from './transport.js';
@@ -208,14 +209,66 @@ const nextFrame = () => new Promise((r) => (typeof requestAnimationFrame === 'fu
 const playableSoundClips = () => project.song.clips.some((c) => c.soundId != null && soundBuffer(c.soundId) && songTrackById(c.trackId) && songTrackAudible(songTrackById(c.trackId)));
 
 /** Download the project as JSON, with imported sounds' audio embedded (base64) so the file is self-contained. */
-export async function saveProject() {
+/*
+ * Saving: you choose the file name (and, where the browser allows, the folder).
+ *  - Chrome / Edge on a computer: the system "Save as" window (File System Access API), starting in
+ *    the folder you saved in last time.
+ *  - elsewhere (Safari, Firefox, phones): a name dialog, then a download (the browser decides where:
+ *    usually Downloads, or it asks if it is set to).
+ * The last name used (or the name of the file you opened) is offered next time.
+ */
+const DEFAULT_SAVE_NAME = 'whistle-project.json';
+export const saveState = { name: DEFAULT_SAVE_NAME, handle: null };
+
+/** "my song" → "my song.json"; strips characters file systems reject. */
+export function jsonFileName(name) {
+  const clean = String(name).replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').trim().replace(/^\.+/, '');
+  if (!clean) return DEFAULT_SAVE_NAME;
+  return /\.json$/i.test(clean) ? clean : `${clean}.json`;
+}
+
+async function projectText() {
   let text = serialize();
   if (project.sounds.length) {
     const data = JSON.parse(text);
     data.soundData = await soundDataForSave();
     text = JSON.stringify(data);
   }
-  download('whistle-project.json', text, 'application/json');
+  return text;
+}
+
+export async function saveProject() {
+  if (typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function') {
+    let handle;
+    try { // must open straight from the click, before anything is awaited
+      handle = await window.showSaveFilePicker({
+        suggestedName: saveState.name,
+        startIn: saveState.handle || 'documents',
+        types: [{ description: 'OpenDAW project', accept: { 'application/json': ['.json'] } }],
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // cancelled
+      handle = null; // not allowed here (e.g. in a frame): fall back to a download
+    }
+    if (handle) {
+      try {
+        const writable = await handle.createWritable();
+        await writable.write(await projectText());
+        await writable.close();
+        Object.assign(saveState, { name: handle.name, handle });
+        status(`Saved ${handle.name}.`);
+      } catch (err) {
+        status('Saving failed: ' + err.message, true);
+      }
+      return;
+    }
+  }
+  const name = await askText({ title: 'Save project', label: 'File name', value: saveState.name, confirmLabel: 'Save', message: 'Saved to your downloads, as a .json file you can open again later.' });
+  if (name == null) return;
+  const file = jsonFileName(name);
+  download(file, await projectText(), 'application/json');
+  saveState.name = file;
+  status(`Saved ${file}.`);
 }
 
 function stopEverything() {
@@ -232,6 +285,7 @@ export async function loadProjectFile(file) {
     stopEverything();
     pushUndo();
     loadProjectData(data);
+    Object.assign(saveState, { name: jsonFileName(file.name), handle: null }); // saving again offers the same name
     if (project.sounds.length) {
       await storeEmbeddedSounds(data.soundData);
       const missing = project.sounds.filter((s) => !soundBuffer(s.id)).length;
@@ -247,6 +301,7 @@ export function newProject() {
   stopEverything();
   pushUndo();
   resetProject({ keepSettings: true });
+  Object.assign(saveState, { name: DEFAULT_SAVE_NAME, handle: null });
   ui.playhead = 0;
   ui.songPlayhead = 0;
   status('New project. (Undo brings the previous one back.)');

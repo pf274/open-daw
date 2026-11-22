@@ -18,7 +18,7 @@ const dialog = ref(null);
 function onKey(e) {
   if (e.key === 'Escape') { e.preventDefault(); emit('close'); }
   else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); emit('apply'); }
-  else if (e.key === ' ' && !['BUTTON', 'SELECT'].includes(e.target.tagName) && e.target.type !== 'checkbox') { e.preventDefault(); emit('preview'); }
+  else if (e.key === ' ' && !['BUTTON', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && !['checkbox', 'text', 'search'].includes(e.target.type)) { e.preventDefault(); emit('preview'); } // text fields keep their spaces
 }
 
 watch(() => props.open, async (open) => {

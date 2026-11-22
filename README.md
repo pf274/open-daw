@@ -253,7 +253,7 @@ The editor has two tabs: **Sound** (oscillators, envelope, vibrato, output) and 
 ## Layout
 
 - **Header:** tabs on the left, then the controls: 🎼 Song, Rec, Tap rhythm and Loop (pattern editor only), Play, Stop, Restart, Metronome, Undo/Redo, theme. Tempo (**BPM**) is in **Settings → Time**, and the **🎤 Mic** switch (with level meter and live note) is in **Settings → Input & pick mode**.
-  - **File tab:** New, Open…, Save, Export MIDI, Export WAV.
+  - **File tab:** New, Open…, Save…, Export MIDI, Export WAV.
   - **Settings tab:** Time (time signature), Playback (song transpose, count-in, volume), Editing (note snap, song snap, new-note velocity, key, scale), Whistle alignment (note length, pitch window, tap offset, whistle transpose, clarity, trace, Re-align), Input & pick mode (mic device, confirm hold, live drum pads).
   - Click the open tab again to collapse the panel and give the roll more room. The choice is remembered in this browser.
 - **Left:** layers and help. **Centre:** piano roll. **Bottom:** status, selection count, position, tempo and song transpose.
@@ -278,7 +278,7 @@ The editor has two tabs: **Sound** (oscillators, envelope, vibrato, output) and 
 
 Everything else is in the right-click menu: **Select ▸**, **Transpose ▸** (semitone/octave, snap to scale, song key), **Timing ▸** (Quantize… dialog with grid, strength, ends and preview; nudge; length = snap; legato; stretch ×2/×½), **Velocity ▸** (louder/softer, pp–fff), **Move to layer ▸**, plus Change notes…, Connect/Disconnect and Tremor…. The status bar shows how many notes are selected.
 
-The project autosaves to the browser. **Save/Load** writes and reads JSON.
+The project autosaves to the browser. **Save…/Open…** write and read JSON. **Save…** lets you choose the file name: in Chrome and Edge on a computer it opens the system Save window, so you pick the folder too (it starts where you saved last time). Other browsers and phones ask for the name and then download the file, and the browser decides where it goes, usually your Downloads folder. The name you last saved under, or the name of the file you opened, is suggested next time.
 
 ## Architecture
 

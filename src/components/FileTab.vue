@@ -20,7 +20,7 @@ function onNew() {
       <span class="caption">Project</span>
       <button title="Start an empty project" @click="onNew">New</button>
       <button title="Open a saved project (.json)" @click="fileInput.click()">Open…</button>
-      <button title="Download the project as .json" @click="saveProject">Save</button>
+      <button title="Save the project as a .json file: choose its name (and folder, where your browser allows)" @click="saveProject">Save…</button>
       <input ref="fileInput" type="file" accept=".json,application/json" hidden @change="onFile">
     </div>
     <div class="group">
