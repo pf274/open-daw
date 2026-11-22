@@ -65,6 +65,7 @@ export function createRollInteraction(canvas) {
     const tr = curTrack(), hit = hitNote(x, y, touch ? 14 : 7); // fingers get a wider resize edge
     if (hit) {
       const n = hit.note;
+      ui.noteLen = n.dur; // new notes take the length of the last note picked
       if (e.shiftKey) { ui.sel.has(n.id) ? ui.sel.delete(n.id) : ui.sel.add(n.id); return; }
       if (!ui.sel.has(n.id)) ui.sel = new Set([n.id]);
       // snapshot now, but only commit it to history once the click becomes a real drag
@@ -168,6 +169,7 @@ export function createRollInteraction(canvas) {
       // a click that never became a drag: drop any Alt-copies; history was never touched
       if (!d.moved && d.dupIds) { tr.notes = tr.notes.filter((n) => !d.dupIds.has(n.id)); ui.sel.clear(); }
       tr.notes.sort((p, q) => p.start - q.start);
+      if (d.mode === 'resize' && d.moved) ui.noteLen = d.anchorNote.dur;
     }
     invalidate();
   }
@@ -183,7 +185,7 @@ export function createRollInteraction(canvas) {
       ui.sel.delete(hit.note.id);
     } else {
       const start = Math.max(0, ui.snap ? Math.floor(xb(x) / ui.snap) * ui.snap : xb(x));
-      const n = { id: nid(), start, dur: grid(), pitch: yp(y), vel: +project.settings.vel || 96 };
+      const n = { id: nid(), start, dur: ui.noteLen || grid(), pitch: yp(y), vel: +project.settings.vel || 96 };
       tr.notes.push(n);
       tr.notes.sort((p, q) => p.start - q.start);
       ui.sel = new Set([n.id]);
