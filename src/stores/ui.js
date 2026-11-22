@@ -12,6 +12,10 @@ export function loadPref(key, def) {
 /** Song view track-header column width limits (px). Declared before `ui`, which reads it on creation. */
 export const HEAD_W = { min: 150, max: 420, def: 230 };
 
+/** Pitch-row height (px) the piano roll starts at; a vertical pinch makes rows up to TOUCH_ROW_MAX tall (never shorter). */
+export const ROW_DEFAULT = 14;
+export const TOUCH_ROW_MAX = ROW_DEFAULT * 3;
+
 export const ui = reactive({
   // transport & grid
   snap: 0.25,
@@ -25,7 +29,7 @@ export const ui = reactive({
 
   // piano-roll viewport
   ppb: 80,          // pixels per beat
-  row: 14,          // pixels per pitch row
+  row: ROW_DEFAULT, // pixels per pitch row
   scrollX: 0,       // beats
   topPitch: 84,     // pitch value at the top edge
   showTrace: true,

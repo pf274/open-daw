@@ -13,7 +13,7 @@ const App = (await import('../src/App.vue')).default;
 const { project, curTrack, resetProject } = await import('../src/stores/project.js');
 const { ui } = await import('../src/stores/ui.js');
 const { device } = await import('../src/stores/device.js');
-const { view, bx, py } = await import('../src/stores/view.js');
+const { view, bx, py, RULER } = await import('../src/stores/view.js');
 const { createRollInteraction } = await import('../src/roll/interaction.js');
 const { installLongPress } = await import('../src/composables/touch.js');
 const { pick, enterPick } = await import('../src/engine/pick.js');
@@ -131,6 +131,38 @@ describe('piano roll with a finger', () => {
     r.onPointerUp(touch(x - 100, y, { pointerId: 1 }));
     r.onPointerUp(touch(x + 100, y, { pointerId: 2 }));
     expect(curTrack().notes).toHaveLength(1); // nothing added or moved
+  });
+
+  it('a vertical pinch makes notes taller (up to 3×, never below the normal height); time zoom is untouched', () => {
+    const [x, y] = at(8, 60);
+    const ppb = ui.ppb;
+    const pinch = (d) => { r.onPointerMove(touch(x, y - d, { pointerId: 1 })); r.onPointerMove(touch(x + 10, y + d, { pointerId: 2 })); };
+    r.onPointerDown(touch(x, y - 40, { pointerId: 1 }));
+    r.onPointerDown(touch(x + 10, y + 40, { pointerId: 2 })); // one above the other: a vertical pinch
+    pinch(60);
+    expect(ui.row).toBeCloseTo(21); // 80 → 120 px apart: 1.5×
+    expect(ui.ppb).toBe(ppb);
+    pinch(400);
+    expect(ui.row).toBe(42); // at most 3× the normal 14 px
+    pinch(5);
+    expect(ui.row).toBe(14); // never smaller than normal
+    r.onPointerUp(touch(x, y - 5, { pointerId: 1 }));
+    r.onPointerUp(touch(x + 10, y + 5, { pointerId: 2 }));
+    expect(curTrack().notes).toHaveLength(1); // nothing added or moved
+  });
+
+  it('the pitch between the fingers stays put while the rows grow', () => {
+    const [x, y] = at(8, 60);
+    const pitchAt = (yy) => ui.topPitch - (yy - RULER) / ui.row;
+    const p0 = pitchAt(y);
+    r.onPointerDown(touch(x, y - 40, { pointerId: 1 }));
+    r.onPointerDown(touch(x, y + 40, { pointerId: 2 }));
+    r.onPointerMove(touch(x, y - 80, { pointerId: 1 }));
+    r.onPointerMove(touch(x, y + 80, { pointerId: 2 }));
+    expect(ui.row).toBe(28);
+    expect(pitchAt(y)).toBeCloseTo(p0);
+    r.onPointerUp(touch(x, y - 80, { pointerId: 1 }));
+    r.onPointerUp(touch(x, y + 80, { pointerId: 2 }));
   });
 
   it('while recording, tapping the screen counts as a tap', () => {

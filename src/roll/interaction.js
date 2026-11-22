@@ -3,13 +3,13 @@
  * ruler seek + loop, wheel scroll/zoom, context menu.
  *
  * Touch (onPointer*): a finger on a note moves/resizes it like the mouse; on empty space it pans;
- * two fingers pan and pinch-zoom; double-tap adds/deletes; double-tap-and-drag on empty space box-selects; long-press opens the menu; while
+ * two fingers pan and pinch-zoom (side by side: time; one above the other: note height); double-tap adds/deletes; double-tap-and-drag on empty space box-selects; long-press opens the menu; while
  * recording, tapping anywhere counts as a tap; in pick mode the keyboard strip plays the pitch.
  */
 import { clamp } from '../core/music.js';
 import { cloneNotes } from '../core/slides.js';
 import { curTrack, project, nid } from '../stores/project.js';
-import { ui, selNotes, grid, snapBeat } from '../stores/ui.js';
+import { ui, selNotes, grid, snapBeat, ROW_DEFAULT, TOUCH_ROW_MAX } from '../stores/ui.js';
 import { pushUndo, takeSnapshot, commitUndo } from '../stores/history.js';
 import { view, bx, xb, yp, clampView, invalidate, RULER } from '../stores/view.js';
 import { transport, startTransport } from '../engine/transport.js';
@@ -237,7 +237,12 @@ export function createRollInteraction(canvas) {
     if (view.drag) onMouseUp(); // a second finger: end what the first one started (a moved note stays moved)
     const [a, b] = [...touches.values()];
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    gesture = { kind: 'pinch', spread: Math.max(20, Math.abs(a.x - b.x)), ppb: ui.ppb, beat: xb(mx), pitchAt: ui.topPitch - (my - RULER) / ui.row, mx, my };
+    // fingers side by side zoom time; one above the other, the note height (decided when the pinch starts)
+    const vertical = Math.abs(a.y - b.y) > Math.abs(a.x - b.x);
+    gesture = {
+      kind: 'pinch', vertical, spread: Math.max(20, vertical ? Math.abs(a.y - b.y) : Math.abs(a.x - b.x)),
+      ppb: ui.ppb, row: ui.row, beat: xb(mx), pitchAt: ui.topPitch - (my - RULER) / ui.row, mx, my,
+    };
   }
 
   function onPointerDown(e) {
@@ -296,9 +301,13 @@ export function createRollInteraction(canvas) {
       if (touches.size < 2) return;
       const [a, b] = [...touches.values()];
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      ui.ppb = clamp(g.ppb * (Math.max(20, Math.abs(a.x - b.x)) / g.spread), 8, 600); // spread fingers apart = zoom in on time
+      if (g.vertical) { // taller rows (bigger notes), from the normal height up to 3×
+        ui.row = clamp(g.row * (Math.max(20, Math.abs(a.y - b.y)) / g.spread), ROW_DEFAULT, TOUCH_ROW_MAX);
+      } else { // spread fingers apart = zoom in on time
+        ui.ppb = clamp(g.ppb * (Math.max(20, Math.abs(a.x - b.x)) / g.spread), 8, 600);
+      }
       ui.scrollX = g.beat - (mx - view.KEYW) / ui.ppb; // the beat between the fingers follows them
-      ui.topPitch = g.pitchAt + (my - RULER) / ui.row;
+      ui.topPitch = g.pitchAt + (my - RULER) / ui.row;  // and so does the pitch
       clampView();
       return;
     }
