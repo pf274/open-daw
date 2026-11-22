@@ -7,7 +7,7 @@ import { device } from '../stores/device.js';
     <summary>How to use</summary>
     <p v-if="device.coarse" class="help">
       <b>Touch:</b> ☰ opens this panel. In the roll, drag a note to move it (its right end resizes it), drag empty space to scroll,
-      pinch to zoom (one finger above the other: taller notes), <b>double-tap</b> to add or delete a note, <b>double-tap and drag</b> to box-select, and <b>long-press</b> for the menu (copy, transpose, quantize…).
+      pinch (or − / +) to zoom (one finger above the other: taller notes), <b>double-tap</b> to add or delete a note, <b>double-tap and drag</b> to box-select, and <b>long-press</b> for the menu (copy, transpose, quantize…).
       While recording, <b>tap the roll</b> on each note. In pick mode, hold a key on the left keyboard to choose its pitch.<br>
       <b>Song:</b> tap a pattern or sound in this panel, then double-tap a track to place it. Drag clips to move them, drag their
       edges to shorten them, double-tap and drag to box-select clips, long-press for the clip menu, and pinch (or − / +) to zoom.

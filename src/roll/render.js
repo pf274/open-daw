@@ -10,7 +10,7 @@ import { barBeats, countBeats, onBarLine } from '../core/meter.js';
 import { hasTremor } from '../core/tremor.js';
 import { project, curTrack, isDrum, audible } from '../stores/project.js';
 import { ui } from '../stores/ui.js';
-import { view, bx, xb, py, yp, fy, RULER, KEYW_NORMAL, KEYW_DRUMS } from '../stores/view.js';
+import { view, bx, xb, py, yp, fy, RULER, KEYW_NORMAL, KEYW_DRUMS, noteHandles, HANDLE_R } from '../stores/view.js';
 import { transport, tp, currentBeat } from '../engine/transport.js';
 import { rec } from '../engine/recorder.js';
 import { pick, pickNote, PIANO_KEYS } from '../engine/pick.js';
@@ -160,6 +160,24 @@ export function renderRoll(g) {
   }
 
   if (!drumView) drawSlides(g, tr, 1, 2.5);
+
+  /* touch length handles on selected notes */
+  if (view.touchUi && !pick.active && !transport.recording && U.sel.size) {
+    g.save();
+    g.beginPath(); g.rect(KEYW, RULER, W - KEYW, H - RULER); g.clip();
+    for (const n of tr.notes) {
+      if (!U.sel.has(n.id)) continue;
+      const h = noteHandles(n);
+      for (const k of [h.start, h.end]) {
+        if (k.x < KEYW - HANDLE_R || k.x > W + HANDLE_R) continue;
+        g.fillStyle = C.accent;
+        g.fillRect(Math.round(k.x) - 1, Math.min(k.y, k.stemY), 2, Math.abs(k.stemY - k.y));
+        g.beginPath(); g.arc(k.x, k.y, HANDLE_R, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 2; g.strokeStyle = C.bg; g.stroke();
+      }
+    }
+    g.restore();
+  }
 
   /* rubber band */
   const d = view.drag;

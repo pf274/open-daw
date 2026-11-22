@@ -5,13 +5,14 @@
  * Touch (onPointer*): a finger on a note moves/resizes it like the mouse; on empty space it pans;
  * two fingers pan and pinch-zoom (side by side: time; one above the other: note height); double-tap adds/deletes; double-tap-and-drag on empty space box-selects; long-press opens the menu; while
  * recording, tapping anywhere counts as a tap; in pick mode the keyboard strip plays the pitch.
+ * Selected notes show two length handles (hanging below each end) that a finger can drag.
  */
 import { clamp } from '../core/music.js';
 import { cloneNotes } from '../core/slides.js';
 import { curTrack, project, nid } from '../stores/project.js';
 import { ui, selNotes, grid, snapBeat, ROW_DEFAULT, TOUCH_ROW_MAX } from '../stores/ui.js';
 import { pushUndo, takeSnapshot, commitUndo } from '../stores/history.js';
-import { view, bx, xb, yp, clampView, invalidate, RULER } from '../stores/view.js';
+import { view, bx, xb, yp, clampView, invalidate, RULER, noteHandles } from '../stores/view.js';
 import { transport, startTransport } from '../engine/transport.js';
 import { pick, pickJumpTo, pickPitchDown, pickPitchUp } from '../engine/pick.js';
 import { onTapDown, onTapUp } from '../engine/recorder.js';
@@ -27,6 +28,21 @@ function hitNote(x, y, edgePx = 7) {
     if (x >= x0 && x <= x1) return { note: n, edge: x >= x1 - Math.min(edgePx, (x1 - x0) / 3) };
   }
   return null;
+}
+
+/** A touch length handle under (x, y) on a selected note: { note, which: 'start' | 'end' }. */
+function hitHandle(x, y, r = 22) {
+  if (!ui.sel.size) return null;
+  let best = null, bestD = r;
+  for (const n of curTrack().notes) {
+    if (!ui.sel.has(n.id)) continue;
+    const h = noteHandles(n);
+    for (const which of ['start', 'end']) {
+      const d = Math.hypot(x - h[which].x, y - h[which].y);
+      if (d < bestD) { bestD = d; best = { note: n, which }; }
+    }
+  }
+  return best;
 }
 
 function seek(b) {
@@ -65,6 +81,7 @@ export function createRollInteraction(canvas) {
     const tr = curTrack(), hit = hitNote(x, y, touch ? 14 : 7); // fingers get a wider resize edge
     if (hit) {
       const n = hit.note;
+      ui.noteLen = n.dur; // new notes take the length of the last note picked
       if (e.shiftKey) { ui.sel.has(n.id) ? ui.sel.delete(n.id) : ui.sel.add(n.id); return; }
       if (!ui.sel.has(n.id)) ui.sel = new Set([n.id]);
       // snapshot now, but only commit it to history once the click becomes a real drag
@@ -152,6 +169,19 @@ export function createRollInteraction(canvas) {
         const o = d.orig.get(n.id);
         if (o) n.dur = Math.max(minLen, o.dur + dd);
       }
+    } else if (d.mode === 'resizeStart') { // move the start, keep the end where it is
+      let newStart = a.start + dxBeats;
+      if (ui.snap && !e.ctrlKey) newStart = snapBeat(newStart);
+      let ds = newStart - a.start;
+      ds = Math.max(ds, -Math.min(...[...d.orig.values()].map((o) => o.start)));
+      const minLen = ui.snap ? Math.min(ui.snap, 0.0625) : 0.03125;
+      for (const n of notes) {
+        const o = d.orig.get(n.id);
+        if (!o) continue;
+        const end = o.start + o.dur;
+        n.start = Math.min(o.start + ds, end - minLen);
+        n.dur = end - n.start;
+      }
     }
   }
 
@@ -163,11 +193,12 @@ export function createRollInteraction(canvas) {
       if (ui.loopEnd - ui.loopStart < 0.01) ui.loopEnd = ui.loopStart + 4;
       ui.loop = true;
     }
-    if (d.mode === 'move' || d.mode === 'resize') {
+    if (d.mode === 'move' || d.mode === 'resize' || d.mode === 'resizeStart') {
       const tr = curTrack();
       // a click that never became a drag: drop any Alt-copies; history was never touched
       if (!d.moved && d.dupIds) { tr.notes = tr.notes.filter((n) => !d.dupIds.has(n.id)); ui.sel.clear(); }
       tr.notes.sort((p, q) => p.start - q.start);
+      if ((d.mode === 'resize' || d.mode === 'resizeStart') && d.moved) ui.noteLen = d.anchorNote.dur;
     }
     invalidate();
   }
@@ -183,7 +214,7 @@ export function createRollInteraction(canvas) {
       ui.sel.delete(hit.note.id);
     } else {
       const start = Math.max(0, ui.snap ? Math.floor(xb(x) / ui.snap) * ui.snap : xb(x));
-      const n = { id: nid(), start, dur: grid(), pitch: yp(y), vel: +project.settings.vel || 96 };
+      const n = { id: nid(), start, dur: ui.noteLen || grid(), pitch: yp(y), vel: +project.settings.vel || 96 };
       tr.notes.push(n);
       tr.notes.sort((p, q) => p.start - q.start);
       ui.sel = new Set([n.id]);
@@ -252,8 +283,13 @@ export function createRollInteraction(canvas) {
       onTapDown({ key: 'Tap', code: `Pointer${e.pointerId ?? 0}`, timeStamp: e.timeStamp, repeat: false });
       return;
     }
-    if (e.pointerType !== 'touch') { onMouseDown(e); return; }
+    if (e.pointerType !== 'touch') {
+      if (view.touchUi) { view.touchUi = false; invalidate(); }
+      onMouseDown(e);
+      return;
+    }
     e.preventDefault?.();
+    if (!view.touchUi) { view.touchUi = true; invalidate(); }
     const p = pos(e);
     touches.set(e.pointerId, p);
     if (touches.size === 2) { if (gesture?.kind === 'key') pickPitchUp(); startPinch(); return; }
@@ -267,6 +303,19 @@ export function createRollInteraction(canvas) {
       return;
     }
     if (pick.active) { gesture = { kind: 'done' }; onMouseDown(pointerish(e)); return; }
+    const hh = hitHandle(x, y);
+    if (hh) { // drag a length handle: resize from that end (all selected notes together)
+      gesture = { kind: 'handle' };
+      const a = hh.note;
+      view.drag = {
+        mode: hh.which === 'start' ? 'resizeStart' : 'resize', x0: x, y0: y, moved: false, snap: takeSnapshot(), anchorNote: a, dupIds: null, slop: 4,
+        orig: new Map(selNotes().map((m) => [m.id, { start: m.start, dur: m.dur, pitch: m.pitch }])),
+        lastPitch: a.pitch,
+      };
+      ui.noteLen = a.dur;
+      invalidate();
+      return; // no long-press menu or double-tap on a handle
+    }
     if (hitNote(x, y, 14)) {
       gesture = { kind: 'note', x0: x, y0: y };
       onMouseDown(pointerish(e));
@@ -327,6 +376,7 @@ export function createRollInteraction(canvas) {
       onMouseMove({ clientX: e.clientX, clientY: e.clientY, ctrlKey: false });
       return;
     }
+    if (g.kind === 'handle') { onMouseMove({ clientX: e.clientX, clientY: e.clientY, ctrlKey: false }); return; }
     if (g.kind === 'note' || g.kind === 'ruler') {
       if (g.kind === 'note' && !g.moved && Math.hypot(p.x - g.x0, p.y - g.y0) >= 8) { g.moved = true; cancelPress(); }
       onMouseMove({ clientX: e.clientX, clientY: e.clientY, ctrlKey: false });
@@ -351,6 +401,7 @@ export function createRollInteraction(canvas) {
     if (!g) return;
     if (g.kind === 'key') { pickPitchUp(); return; }
     if (g.kind === 'ruler') { onMouseUp(e); return; }
+    if (g.kind === 'handle') { onMouseUp(e); dtap.reset(); return; }
     if (g.kind === 'box') {
       onMouseUp(e);
       if (g.moved || cancelled) dtap.reset();

@@ -7,6 +7,7 @@ import { setView } from '../engine/song.js';
 import FileTab from './FileTab.vue';
 import SettingsTab from './SettingsTab.vue';
 import { toggleTheme } from '../stores/theme.js';
+import { zoomRoll } from '../stores/view.js';
 
 const TABS = [{ id: 'file', label: 'File' }, { id: 'settings', label: 'Settings' }];
 
@@ -62,6 +63,10 @@ function toggleLoop() {
       <button class="theme" :aria-label="ui.themeResolved === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
         :title="`${ui.themeResolved === 'light' ? 'Dark' : 'Light'} mode (more choices, including following your system, in Settings)`"
         @click="toggleTheme">{{ ui.themeResolved === 'light' ? '☾' : '☀' }}</button>
+      <div v-if="ui.view === 'pattern'" class="group zoom" role="group" aria-label="Zoom">
+        <button title="Zoom out (Ctrl+wheel, or pinch)" aria-label="Zoom out" @click="zoomRoll(1 / 1.25)">−</button>
+        <button title="Zoom in (Ctrl+wheel, or pinch)" aria-label="Zoom in" @click="zoomRoll(1.25)">+</button>
+      </div>
     </div>
 
     <div v-if="ui.tab" class="panel" role="tabpanel">
@@ -82,6 +87,7 @@ function toggleLoop() {
 .rec.on { background: var(--rec); color: var(--on-rec); border-color: var(--rec); }
 .theme { margin-left: auto; min-width: 30px; }
 .menu-btn { display: none; min-width: 34px; }
+.zoom button { min-width: 30px; }
 @media (max-width: 760px) {
   /* one row that scrolls sideways instead of wrapping into several */
   .top { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; padding: 0 6px; }

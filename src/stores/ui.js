@@ -37,6 +37,7 @@ export const ui = reactive({
   // selection & clipboard
   sel: new Set(),   // selected note ids (current track)
   clipboard: null,
+  noteLen: 0,       // length (beats) of the last selected note; new notes copy it (0 = use the grid)
 
   // last-used quantize settings (grid 0 = follow the editor's snap)
   quantize: { grid: 0, strength: 100, ends: false },
