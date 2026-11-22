@@ -18,18 +18,19 @@ npm run build      # static production build in dist/
 
 ## Workflow
 
-1. **Settings → Input & pick mode → 🎤 Mic**, then whistle. The readout next to it shows the detected note and what it maps to after transposition. (You can skip this step: **● Rec** switches the mic on by itself.)
+1. In **Settings → Recording**, choose whether you'll **whistle** or **hum or sing**, then press **🎤 Mic** and try it. The readout next to it shows the detected note and what it maps to after transposition. (You can skip the mic check: **● Rec** switches the mic on by itself.)
 2. Pick a layer, set the playhead (click the ruler), press **● Rec** or `R`.
-3. After the count-in, whistle and **tap any key once per note**. `Esc` stops.
-4. Tap times set the rhythm. Each note's pitch is the median whistled pitch in a short window around its tap.
+3. After the count-in, whistle (or hum) and **tap any key once per note**. `Esc` stops.
+4. Tap times set the rhythm. Each note's pitch is the median pitch heard in a short window around its tap.
 5. Edit in the piano roll, add layers, then **⬇ MIDI** exports every audible layer (SMF type 1, one track per layer, GM program and volume set).
 
-If notes come out wrong, change the **Settings → Whistle alignment** options and press **Re-align last take**. The raw pitch trace and taps are saved, so you don't need to record again:
+If notes come out wrong, change the options under **Settings → Recording** and press **Re-align last take**. The raw pitch trace and taps are saved, so you don't need to record again. Each setting there says which tool it affects:
 - *Note length*: until next tap (legato), how long you held the key, or fixed.
 - *Pitch window start/length*: where pitch is sampled relative to each tap.
 - *Tap offset*: shifts every tap (latency compensation).
-- *Transpose*: whistling sits around C5–C7; the default −12 drops it an octave.
-- *Key + Scale lock*: snaps detected pitches into a scale.
+- *Whistle / hum*: humming and singing are much lower than whistling (about 65–1000 Hz instead of 400–4500 Hz), so **hum or sing** makes the pitch detector listen lower. Each mode has its own transpose: whistling sits around C5–C7 and the default −12 drops it an octave, while a hum stays where you sing it (0). A take remembers which mode it was recorded in, so re-aligning keeps the right transpose.
+- *Min pitch clarity*: raise it if breath or noise turns into wrong notes, lower it if notes are missed.
+- **Settings → Key & scale** snaps recorded pitches to a scale in a key (major, minor, pentatonic, blues, dorian, mixolydian), or to notes you pick yourself with **custom (pick notes)**. Choosing custom starts from the scale you were on, so you can add or remove single notes. **Chromatic** means no snapping. *Snap to scale* in the note menu uses the same notes.
 
 ## Patterns and the Song view
 
@@ -252,9 +253,9 @@ The editor has two tabs: **Sound** (oscillators, envelope, vibrato, output) and 
 
 ## Layout
 
-- **Header:** tabs on the left, then the controls: 🎼 Song, Rec, Tap rhythm and Loop (pattern editor only), Play, Stop, Restart, Metronome, Undo/Redo, theme. Tempo (**BPM**) is in **Settings → Time**, and the **🎤 Mic** switch (with level meter and live note) is in **Settings → Input & pick mode**.
+- **Header:** tabs on the left, then the controls: 🎼 Song, Rec, Tap rhythm and Loop (pattern editor only), Play, Stop, Restart, Metronome, Undo/Redo, theme. Tempo (**BPM**) is in **Settings → Time**, and the **🎤 Mic** switch (with level meter and live note) is in **Settings → Recording**.
   - **File tab:** New, Open…, Save…, Export MIDI, Export WAV.
-  - **Settings tab:** Time (time signature), Playback (song transpose, count-in, volume), Editing (note snap, song snap, new-note velocity, key, scale), Whistle alignment (note length, pitch window, tap offset, whistle transpose, clarity, trace, Re-align), Input & pick mode (mic device, confirm hold, live drum pads).
+  - **Settings tab:** each section starts with a line saying what it's for. Time (tempo, time signature), Playback (song transpose, volume, recorded piano), Editing (note snap, song snap, new-note velocity), Key & scale (key, scale or custom notes), Recording (whistle / hum, mic, mic input, transpose, count-in; *Taps → notes* for ● Rec and 🥁 Tap rhythm; *Reading the pitch* for ● Rec only, with the trace and Re-align), Pick mode & drums (confirm hold, live drum pads), Appearance.
   - Click the open tab again to collapse the panel and give the roll more room. The choice is remembered in this browser.
 - **Left:** layers and help. **Centre:** piano roll. **Bottom:** status, selection count, position, tempo and song transpose.
 

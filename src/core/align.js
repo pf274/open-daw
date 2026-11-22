@@ -1,11 +1,12 @@
 /**
  * Turning a recorded take into notes.
  *
- * take: { bpm, startBeat, endT, frames:[{t,midi,c}], taps:[{down,up}] }
+ * take: { bpm, startBeat, endT, frames:[{t,midi,c}], taps:[{down,up}], mode? ('whistle' | 'hum') }
  *   times are seconds where 0 = startBeat; frames.midi is 0 when unvoiced.
  * settings: the project's alignment settings (see stores/project.js DEFAULT_SETTINGS)
  */
-import { snapToScale } from './scales.js';
+import { scaleNotes, snapToNotes } from './scales.js';
+import { pitchShift } from './voice.js';
 
 export function median(arr) {
   const a = arr.slice().sort((x, y) => x - y);
@@ -65,8 +66,8 @@ export function alignTake(take, s) {
       if (best) sel = [best];
     }
     if (!sel.length) { skipped++; continue; }
-    let m = median(sel.map((f) => f.midi)) + (s.transpose || 0);
-    m = snapToScale(m, s.scaleRoot || 0, s.scale || 'chromatic');
+    let m = median(sel.map((f) => f.midi)) + pitchShift(s, take);
+    m = snapToNotes(m, scaleNotes(s));
     m = Math.max(0, Math.min(127, m));
     notes.push({
       start: take.startBeat + t / spb,

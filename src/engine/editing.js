@@ -5,7 +5,7 @@
 import { clamp, transposeLabel } from '../core/music.js';
 import { normalizeTimeSig, formatTimeSig, barBeats } from '../core/meter.js';
 import { quantizeNotes } from '../core/quantize.js';
-import { snapToScale } from '../core/scales.js';
+import { scaleNotes, snapToNotes } from '../core/scales.js';
 import { canConnect, connectNotes, cloneNotes } from '../core/slides.js';
 import { DEFAULT_TREMOR, hasTremor, normalizeTremor } from '../core/tremor.js';
 import { project, curTrack, nid, isDrum } from '../stores/project.js';
@@ -178,7 +178,7 @@ export const ACTIONS = {
   }),
   half: () => stretch(0.5),
   double: () => stretch(2),
-  scaleSnap: () => edit((ns) => ns.forEach((n) => (n.pitch = snapToScale(n.pitch, +project.settings.scaleRoot, project.settings.scale))), 'Snapped to scale.'),
+  scaleSnap: () => { const notes = scaleNotes(project.settings); return edit((ns) => ns.forEach((n) => (n.pitch = snapToNotes(n.pitch, notes))), 'Snapped to scale.'); },
 
   duplicate: () => edit((ns, tr) => {
     const s = Math.min(...ns.map((n) => n.start)), e = Math.max(...ns.map((n) => n.start + n.dur));

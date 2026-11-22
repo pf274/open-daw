@@ -55,13 +55,44 @@ describe('App (mounted)', () => {
 
   it('switches to Settings, and clicking the active tab collapses the panel', async () => {
     await tab(w, 'Settings').trigger('click');
-    expect(w.find('[role=tabpanel]').text()).toContain('Whistle alignment');
+    expect(w.find('[role=tabpanel]').text()).toContain('Reading the pitch');
     expect(w.find('[role=tabpanel]').text()).toContain('Note snap');
     expect(w.find('[role=tabpanel]').text()).toContain('Time signature');
     await tab(w, 'Settings').trigger('click');
     expect(w.find('[role=tabpanel]').exists()).toBe(false);
     await tab(w, 'File').trigger('click');
     expect(w.find('[role=tabpanel]').text()).toContain('Save');
+  });
+
+  it('Settings: a custom scale (starting from the current one) and the whistle / hum switch', async () => {
+    project.settings.scale = 'major';
+    project.settings.scaleRoot = 7; // G major
+    await tab(w, 'Settings').trigger('click');
+    const panel = () => w.find('[role=tabpanel]');
+    expect(panel().find('select[aria-label=Key]').exists()).toBe(true);
+    const scale = panel().find('select[aria-label=Scale]');
+    scale.element.value = 'custom';
+    await scale.trigger('change');
+    expect(project.settings.customNotes).toEqual([0, 2, 4, 6, 7, 9, 11]); // G major's notes, to edit
+    expect(panel().find('select[aria-label=Key]').exists()).toBe(false); // the picked notes say it all
+    const noteBtn = (n) => panel().findAll('.note-btn').find((b) => b.text() === n);
+    expect(noteBtn('F#').attributes('aria-pressed')).toBe('true');
+    await noteBtn('F#').trigger('click');
+    await noteBtn('F').trigger('click');
+    expect(project.settings.customNotes).toEqual([0, 2, 4, 5, 7, 9, 11]);
+    expect(panel().text()).toContain('Notes: C D E F G A B');
+
+    expect(panel().text()).toContain('Whistle transpose');
+    const mode = panel().find('select[aria-label="Recording input"]');
+    await mode.setValue('hum');
+    expect(project.settings.inputMode).toBe('hum');
+    const tr = panel().find('input[aria-label="Hum transpose"]');
+    expect(tr.element.value).toBe('0');
+    await tr.setValue('12');
+    expect(project.settings.humTranspose).toBe(12);
+    expect(project.settings.transpose).toBe(-12); // whistling keeps its own
+    Object.assign(project.settings, { inputMode: 'whistle', humTranspose: 0, scale: 'chromatic', scaleRoot: 0 });
+    await tab(w, 'Settings').trigger('click');
   });
 
   it('adds a drum layer and selects it', async () => {

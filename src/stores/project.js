@@ -36,8 +36,11 @@ export const DEFAULT_SETTINGS = {
   winLen: 300,         // pitch window length (ms)
   tapShift: 0,         // latency compensation (ms)
   transpose: -12,      // applied to whistled pitch when aligning
+  inputMode: 'whistle', // ● Rec listens for: 'whistle' | 'hum' (core/voice.js)
+  humTranspose: 0,     // applied to hummed / sung pitch when aligning
   scaleRoot: 0,
-  scale: 'chromatic',
+  scale: 'chromatic',  // a name from core/scales.js SCALES, or 'custom'
+  customNotes: [0, 2, 4, 5, 7, 9, 11], // pitch classes (0 = C) for the custom scale
   minClarity: 0.7,
   vel: 96,
   holdMs: 750,         // pick mode: hold this long to confirm

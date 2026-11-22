@@ -9,6 +9,7 @@ import { slideLinks } from '../core/slides.js';
 import { barBeats, countBeats, onBarLine } from '../core/meter.js';
 import { hasTremor } from '../core/tremor.js';
 import { project, curTrack, isDrum, audible } from '../stores/project.js';
+import { pitchShift } from '../core/voice.js';
 import { ui } from '../stores/ui.js';
 import { view, bx, xb, py, yp, fy, RULER, KEYW_NORMAL, KEYW_DRUMS, noteHandles, HANDLE_R } from '../stores/view.js';
 import { transport, tp, currentBeat } from '../engine/transport.js';
@@ -96,18 +97,18 @@ export function renderRoll(g) {
   }
   g.globalAlpha = 1;
 
-  /* whistle trace (selected layer's take, or the live recording) */
+  /* pitch trace (selected layer's take, or the live recording) */
   const traceTake = transport.recording && toRaw(tp.target) === tr
     ? { startBeat: tp.startBeat, bpm: rec.bpm, frames: rec.frames, taps: rec.taps }
     : tr.take;
   if (U.showTrace && traceTake) {
-    const spb = 60 / traceTake.bpm;
+    const spb = 60 / traceTake.bpm, shift = pitchShift(s, traceTake);
     g.fillStyle = C.trace;
     for (const f of traceTake.frames) {
       if (!(f.midi > 0) || f.c < s.minClarity) continue;
       const x = bx(traceTake.startBeat + f.t / spb);
       if (x < KEYW || x > W) continue;
-      g.fillRect(x - 1, fy(f.midi + s.transpose) - 1, 2, 2);
+      g.fillRect(x - 1, fy(f.midi + shift) - 1, 2, 2);
     }
   }
 
@@ -287,7 +288,7 @@ function drawKeys(g, { pTop, pBot, drumView, U, s }) {
   // live pitch marker
   if (!drumView && isMicOn() && live.midi > 0 && live.clarity >= s.minClarity) {
     g.fillStyle = C.rec;
-    g.beginPath(); g.arc(KEYW - 7, fy(live.midi + s.transpose), 4, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(KEYW - 7, fy(live.midi + pitchShift(s)), 4, 0, Math.PI * 2); g.fill();
   }
 }
 

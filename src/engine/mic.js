@@ -5,7 +5,9 @@
  */
 import { ensureAudio, getCtx } from '../audio/context.js';
 import { detectPitch, freqToMidi } from '../core/pitch.js';
+import { INPUT_MODES, inputMode } from '../core/voice.js';
 import { ui, status } from '../stores/ui.js';
+import { project } from '../stores/project.js';
 
 export const live = { midi: 0, clarity: 0, rms: 0 };
 
@@ -63,7 +65,7 @@ function poll() {
   if (!analyser) return;
   analyser.getFloatTimeDomainData(buf);
   const sr = getCtx().sampleRate;
-  const r = detectPitch(buf, sr);
+  const r = detectPitch(buf, sr, INPUT_MODES[inputMode(project.settings)]); // whistle or hum range
   live.rms = r.rms;
   live.clarity = r.clarity;
   live.midi = r.freq ? freqToMidi(r.freq) : 0;

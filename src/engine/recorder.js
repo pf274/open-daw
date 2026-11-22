@@ -9,6 +9,7 @@ import { getCtx } from '../audio/context.js';
 import { playVoice } from '../audio/synth.js';
 import { padPitch, shiftDrumBank, BANK_KEYS, bankLabel, padHelp } from './drumPads.js';
 import { alignTake, rhythmFromTaps } from '../core/align.js';
+import { inputMode } from '../core/voice.js';
 import { project, curTrack, isDrum, nid, setTake } from '../stores/project.js';
 import { ui, status } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
@@ -71,7 +72,7 @@ transportHooks.onRecordStop = ({ target: tr, startBeat, rhythmOnly }) => {
   rec.open.clear();
   if (!tr || !project.tracks.includes(tr)) return;
   if (!rec.taps.length) { status('Recording stopped — no taps captured (tap any key on each note).', true); return; }
-  const take = { bpm: rec.bpm, startBeat, endT: Math.max(0, endT), frames: rec.frames, taps: rec.taps };
+  const take = { bpm: rec.bpm, startBeat, endT: Math.max(0, endT), frames: rec.frames, taps: rec.taps, mode: inputMode(project.settings) }; // re-align keeps the mode's transpose
   pushUndo();
   if (rhythmOnly && isDrum(tr)) finishDrumTake(tr, take);
   else if (rhythmOnly) finishRhythmTake(tr, take);
@@ -149,7 +150,7 @@ export async function startRecording(rhythmOnly) {
       ? `Tapping drum rhythm into "${tr.name}" — tap any key on each hit, Esc when done. Then pick each drum.`
       : rhythmOnly
       ? `Tapping rhythm into "${tr.name}" — tap any key on each note, Esc when done. Then pick pitches.`
-      : `Recording into "${tr.name}" — whistle and tap any key on each note. Esc to stop.`,
+      : `Recording into "${tr.name}" — ${inputMode(project.settings) === 'hum' ? 'hum or sing' : 'whistle'} and tap any key on each note. Esc to stop.`,
   );
 }
 
