@@ -134,7 +134,7 @@ function scheduleRange(b0, b1, a, spb) {
   }
   if (transport.mode === 'song') { scheduleSongRange(b0, b1, at, spb, a.beat); return; }
   for (const tr of project.tracks) {
-    if (transport.recording && tr === tp.target && !drumOverdub()) continue; // being replaced
+    if (transport.recording && tr === tp.target && !transport.rhythmOnly) continue; // being replaced by the whistled take (tapped rhythm adds to it: keep playing)
     if (!audible(tr)) continue;
     scheduleTrack(tr, b0, b1, at, spb, trackBus(tr), a.beat);
   }

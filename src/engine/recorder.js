@@ -1,7 +1,8 @@
 /**
  * Recording: collects pitch frames + key taps during a take, then turns them into notes.
  *  - whistle mode:  taps give rhythm, pitch frames give pitch (core/align.js)
- *  - rhythm mode:   taps give empty slots, then pick mode chooses pitches
+ *  - rhythm mode:   taps give empty slots, then pick mode chooses pitches; added to the layer (its
+ *                   notes stay and play along), and taps already count during the count-in (pickups)
  *  - drum layers:   rhythm passes add to the pattern and can loop
  */
 import { getCtx } from '../audio/context.js';
@@ -46,7 +47,7 @@ export function onTapDown(e) {
     if (pitch == null) return;
     playVoice(trackBus(tp.target), 'drums', pitch, getCtx().currentTime, 0.1, +project.settings.vel || 96);
   }
-  if (t < -0.15) return; // still in the count-in
+  if (t < -0.15 && !transport.rhythmOnly) return; // still in the count-in (tapping rhythm counts it: pickup notes)
   const tap = { down: +t.toFixed(4), up: null };
   if (drumOverdub()) { // beat from the transport clock so loop wraps land correctly
     tap.beat = beatAtPerf(stamp);
@@ -92,23 +93,31 @@ export function applyTake(tr, take) {
   return res;
 }
 
+/** Taps in the count-in that fell before the start of the pattern (beat 0) can't become notes. */
+const tooEarly = (n) => (n ? ` ${n} tap${n === 1 ? '' : 's'} before the start of the pattern ${n === 1 ? 'was' : 'were'} left out (start recording later in the pattern for pickup notes).` : '');
+
+/** Tapped rhythm → new notes, added to the layer (existing notes are kept); then pick mode chooses their pitches. */
 function finishRhythmTake(tr, take) {
-  const slots = rhythmFromTaps(take, project.settings);
-  const endBeat = take.startBeat + (take.endT * take.bpm) / 60;
-  const prev = tr.notes.filter((n) => n.start < take.startBeat - 1e-6).pop();
+  const all = rhythmFromTaps(take, project.settings);
+  const slots = all.filter((sl) => sl.start > -0.05).map((sl) => ({ ...sl, start: Math.max(0, sl.start) }));
+  const early = all.length - slots.length;
+  if (!slots.length) { status('No notes added —' + tooEarly(early), true); return; }
+  const prev = tr.notes.filter((n) => n.start < slots[0].start - 1e-6).pop();
   const placeholder = prev ? prev.pitch : 60;
-  tr.notes = tr.notes.filter((n) => n.start < take.startBeat - 1e-6 || n.start >= endBeat);
   const made = slots.map((sl) => ({ id: nid(), ...sl, pitch: placeholder, vel: +project.settings.vel || 96 }));
   tr.notes.push(...made);
   tr.notes.sort((a, b) => a.start - b.start);
   setTake(tr, null); // no pitch data — re-align would wipe these notes
   enterPick(made.map((n) => n.id), placeholder, false);
+  if (early) status(tooEarly(early).trim(), true);
 }
 
 function finishDrumTake(tr, take) {
   // drums add to the existing pattern so passes can be layered, even while looping
   const shiftBeats = ((project.settings.tapShift || 0) / 1000) * take.bpm / 60;
-  const made = take.taps.filter((tap) => tap.beat != null).map((tap) => ({
+  const hits = take.taps.filter((tap) => tap.beat != null && tap.beat + shiftBeats > -0.05); // count-in taps before beat 0: nowhere to go
+  const early = take.taps.length - hits.length;
+  const made = hits.map((tap) => ({
     id: nid(),
     start: Math.max(0, tap.beat + shiftBeats),
     dur: 0.25,
@@ -119,9 +128,10 @@ function finishDrumTake(tr, take) {
   tr.notes.sort((a, b) => a.start - b.start);
   if (project.settings.livePads) {
     ui.sel = new Set(made.map((n) => n.id));
-    status(`Added ${made.length} drum hits to "${tr.name}" (selected — press Q to quantize, Ctrl+Z to undo).`);
+    status(`Added ${made.length} drum hits to "${tr.name}" (selected — press Q to quantize, Ctrl+Z to undo).` + tooEarly(early));
   } else {
-    enterPick(made.map((n) => n.id), 36, false); // second part: choose each hit's drum
+    if (made.length) enterPick(made.map((n) => n.id), 36, false); // second part: choose each hit's drum
+    if (early) status(tooEarly(early).trim(), true);
   }
 }
 

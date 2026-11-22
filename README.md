@@ -107,7 +107,7 @@ Changing it never moves notes; bars just regroup them. It's saved with the proje
 
 ## Tap-rhythm + keyboard-piano mode (no mic)
 
-1. Press **🥁 Tap rhythm** (or `T`). After the count-in, tap any key on each note, then press `Esc`. Each tap becomes an empty note slot. Note lengths follow the same *Note length* setting.
+1. Press **🥁 Tap rhythm** (or `T`). Tap any key on each note, then press `Esc`. Each tap becomes an empty note slot. Note lengths follow the same *Note length* setting. The new notes are **added** to the layer: its existing notes stay, and keep playing while you tap. Taps already count during the count-in, so you can tap pickup notes that lead into the playhead. Taps that would land before the start of the pattern are left out, so start further in for pickups at the very beginning.
 2. Pick mode starts on the first slot. The keyboard is now a piano:
    - `A W S E D F T G Y H U J K O L P ; '` play C through F, an octave and a half. The home row is the white keys, the row above is the black keys. The letters also show on the roll's keyboard.
    - A **short press** previews the pitch and sets it on the current note.

@@ -378,6 +378,64 @@ describe('views', () => {
   });
 });
 
+describe('tapping rhythm', () => {
+  const tapAt = async (ms) => {
+    const { onTapDown, onTapUp } = await import('../src/engine/recorder.js');
+    onTapDown({ key: 'j', code: 'KeyJ', timeStamp: ms, repeat: false });
+    onTapUp({ key: 'j', code: 'KeyJ', timeStamp: ms + 100 });
+  };
+  // 100 BPM: 600 ms per beat; recording starts 150 ms after the clock, then a 4-beat count-in
+  const T0 = 150 + 4 * 600;
+
+  it('adds the tapped notes to the layer (existing notes stay, and play along), counting taps in the count-in', async () => {
+    const { startRecording } = await import('../src/engine/recorder.js');
+    const { pick, exitPick } = await import('../src/engine/pick.js');
+    const tr = curPattern().layers[0];
+    tr.notes = [note(1, 1, 1, 64), note(2, 4.5, 0.5, 67)];
+    ui.view = 'pattern';
+    project.bpm = 100;
+    ui.countIn = 4;
+    ui.playhead = 4;
+    clock.t = 0;
+    await startRecording(true);
+    expect(transport.recording).toBe(true);
+    voices.length = 0;
+    clock.t = 3.4;
+    schedule();
+    expect(voices.some((v) => v[2] === 67)).toBe(true); // the layer's own notes still play while tapping
+    await tapAt(T0 - 600); // in the count-in, one beat early: a pickup at beat 3
+    await tapAt(T0);       // beat 4
+    await tapAt(T0 + 600); // beat 5
+    stopTransport();
+    const starts = tr.notes.map((n) => +n.start.toFixed(3));
+    expect(starts).toEqual([1, 3, 4, 4.5, 5]);
+    expect(tr.notes.find((n) => n.id === 2)).toMatchObject({ start: 4.5, pitch: 67 }); // untouched
+    expect(pick.active).toBe(true); // then choose the new notes' pitches
+    exitPick();
+    undo();
+    expect(curPattern().layers[0].notes.map((n) => n.id)).toEqual([1, 2]); // one undo step (undo restores fresh layer objects)
+  });
+
+  it('count-in taps before the start of the pattern are left out, with a note saying so', async () => {
+    const { startRecording } = await import('../src/engine/recorder.js');
+    const { exitPick } = await import('../src/engine/pick.js');
+    const tr = curPattern().layers[0];
+    tr.notes = [];
+    ui.view = 'pattern';
+    project.bpm = 100;
+    ui.countIn = 4;
+    ui.playhead = 0;
+    clock.t = 0;
+    await startRecording(true);
+    await tapAt(T0 - 1200); // two beats before beat 0
+    await tapAt(T0);
+    stopTransport();
+    expect(tr.notes.map((n) => n.start)).toEqual([0]);
+    expect(ui.status.msg).toMatch(/1 tap before the start of the pattern was left out/);
+    exitPick();
+  });
+});
+
 describe('time signature', () => {
   it('regroups bars without moving notes: pattern lengths, snap, duplicates, undo', async () => {
     const { setTimeSig } = await import('../src/engine/editing.js');
