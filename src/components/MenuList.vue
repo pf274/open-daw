@@ -6,6 +6,8 @@ defineOptions({ name: 'MenuList' });
 defineProps({ items: { type: Array, required: true } });
 const emit = defineEmits(['done']);
 
+/** Where submenus open inside the menu (which scrolls) instead of flying out: keep in step with the CSS below and ContextMenu.vue. */
+const INLINE_SUBMENUS = '(max-width: 760px), (pointer: coarse)';
 const open = ref(-1);
 const subStyle = ref({});
 let subEl = null;
@@ -22,7 +24,7 @@ async function openSub(i, it) {
   if (open.value < 0) return;
   await nextTick();
   const el = subEl?.$el;
-  if (!el || window.matchMedia?.('(max-width: 760px)').matches) return; // phones: submenus open inline
+  if (!el || window.matchMedia?.(INLINE_SUBMENUS).matches) return; // phones / touch screens: submenus open inline
   // keep the submenu on screen: flip left if needed, and nudge up near the bottom
   const r = el.getBoundingClientRect();
   const style = {};
@@ -76,7 +78,7 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .stepper .label { flex: 1; }
 .stepper .value { min-width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
 @media (pointer: coarse) { .keys:not(.arrow) { display: none; } } /* keyboard shortcuts mean nothing on a touch screen */
-@media (max-width: 760px) {
+@media (max-width: 760px), (pointer: coarse) {
   .sub { position: static; margin: 2px 0 4px 10px; box-shadow: none; min-width: 0; }
   .menu { min-width: min(240px, calc(100vw - 16px)); }
 }

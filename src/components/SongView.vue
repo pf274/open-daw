@@ -151,6 +151,7 @@ const dtap = doubleTapper();
 function onLaneUp(e, t) {
   if (e.pointerType !== 'touch' || e.target !== e.currentTarget) return;
   if (marquee.value?.active) { dtap.reset(); return; } // the end of a double-tap-and-drag box selection, not a tap
+  ui.songSel.clear(); // a tap on empty space deselects (on release: a long-press menu keeps the selection)
   if (dtap(e, `lane${t.id}`)) onLaneDblClick(e, t);
 }
 /** Song view zoom (also Ctrl+wheel). */
@@ -269,11 +270,13 @@ function gridPoint(e) {
   const r = gridEl.value?.getBoundingClientRect() ?? { left: 0, top: 0 };
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
+let lanePointer = 'mouse'; // what last pressed a lane: a finger's long-press menu keeps the selection
 function onLaneDown(e, t) {
+  lanePointer = e.pointerType || 'mouse';
   if (e.button !== 0) return;
   const touch = e.pointerType === 'touch';
   // a finger scrolls the song; tap, then press again and drag to box-select (onLaneTouchStart stops the scroll)
-  if (touch && !dtap.pending(e, `lane${t.id}`)) { ui.songSel.clear(); return; }
+  if (touch && !dtap.pending(e, `lane${t.id}`)) return; // (a tap deselects when it lifts: see onLaneUp)
   const { x, y } = gridPoint(e);
   const base = e.shiftKey ? new Set(ui.songSel) : new Set();
   ui.songSel = new Set(base);
@@ -512,10 +515,10 @@ function onClipContext(e, c) {
   if (!ui.songSel.has(c.id)) ui.songSel = new Set([c.id]);
   Object.assign(ui.ctxMenu, { open: true, kind: 'clip', x: e.clientX, y: e.clientY, beat: c.start, trackId: c.trackId });
 }
-/** Right-click empty space on a track: the clip menu, with "Paste here" aimed at that spot. */
+/** Right-click empty space on a track: the clip menu, with "Paste here" aimed at that spot. A long-press keeps the selection, so its menu acts on the selected clips. */
 function onLaneContext(e, t) {
   e.preventDefault();
-  ui.songSel.clear();
+  if (lanePointer !== 'touch') ui.songSel.clear();
   Object.assign(ui.ctxMenu, { open: true, kind: 'clip', x: e.clientX, y: e.clientY, beat: snapSong(beatAt(e, e.currentTarget)), trackId: t.id });
 }
 /** Double-click / Enter: open a pattern clip in the editor; play a sound clip. */

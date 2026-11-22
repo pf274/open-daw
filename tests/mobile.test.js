@@ -339,6 +339,43 @@ describe('phone layout and the Song view by touch', () => {
     expect(lanes()).toEqual([false, true]);
   });
 
+  it('a long-press menu keeps the selected clips selected; a tap on empty space still deselects', async () => {
+    await new Promise((res) => setTimeout(res, 750)); // clear of earlier double-taps
+    const tid = project.song.tracks[0].id;
+    project.song.clips.splice(0, project.song.clips.length,
+      { id: 9201, trackId: tid, patternId: project.curPattern, start: 0 }, { id: 9202, trackId: tid, patternId: project.curPattern, start: 8 });
+    ui.songSel = new Set([9201, 9202]);
+    await flushPromises();
+    const lane = w.findAll('.lane')[0];
+    lane.element.getBoundingClientRect = () => ({ left: 0, top: 0, width: 2000, height: 56 });
+    const t = { pointerType: 'touch', button: 0, clientX: 900, clientY: 20 };
+    await lane.trigger('pointerdown', t); // finger down on empty space…
+    expect(ui.songSel.size).toBe(2);
+    await lane.trigger('contextmenu', { clientX: 900, clientY: 20 }); // …held: the long-press menu
+    expect(ui.ctxMenu).toMatchObject({ open: true, kind: 'clip' });
+    expect([...ui.songSel]).toEqual([9201, 9202]);
+    ui.ctxMenu.open = false;
+    window.dispatchEvent(new Event('pointercancel'));
+    await new Promise((res) => setTimeout(res, 750));
+    await lane.trigger('pointerdown', t);
+    await lane.trigger('pointerup', t); // a plain tap
+    expect(ui.songSel.size).toBe(0);
+  });
+
+  it('lifting the finger that long-pressed does not choose the menu item under it; a fresh tap does', async () => {
+    const run = vi.fn();
+    Object.assign(ui.ctxMenu, { open: true, kind: 'custom', serial: (ui.ctxMenu.serial || 0) + 1, x: 10, y: 10, items: [{ label: 'Do it', run }] });
+    await flushPromises();
+    const btn = w.find('.ctx button[role=menuitem]');
+    btn.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })); // the release's click
+    expect(run).not.toHaveBeenCalled();
+    expect(ui.ctxMenu.open).toBe(true);
+    btn.element.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    btn.element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+    expect(run).toHaveBeenCalledOnce();
+    expect(ui.ctxMenu.open).toBe(false);
+  });
+
   it('on a phone, each track row has a ⋯ menu: mute, solo, colour, move, delete (and on/off for automation)', async () => {
     const { addAutomation } = await import('../src/engine/automation.js');
     addAutomation();
