@@ -139,7 +139,10 @@ export function schedule() {
 function scheduleRange(b0, b1, a, spb) {
   const at = (beat) => a.t + (beat - a.beat) * spb;
   const step = beatLen(); // a click per counted beat, accented on bar lines
-  for (let b = Math.ceil(b0 / step - 1e-9) * step; b < b1; b += step) {
+  // each click belongs to exactly one range: ranges meet at a beat that can be off by a rounding error,
+  // so both ends use the same tolerance (otherwise a click on the seam is scheduled twice)
+  for (let k = Math.ceil(b0 / step - 1e-9); k * step < b1 - 1e-9; k++) {
+    const b = k * step;
     const inCount = transport.recording && b < tp.countInEnd - 1e-9;
     if (inCount || ui.metronome) click(at(b), onBarLine(b, project.timeSig));
   }

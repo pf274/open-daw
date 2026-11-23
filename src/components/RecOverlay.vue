@@ -2,13 +2,15 @@
 import { transport, tp, currentBeat } from '../engine/transport.js';
 import { rec } from '../engine/recorder.js';
 import { beatLen } from '../stores/project.js';
+import { ui } from '../stores/ui.js';
 import { useFrameValue } from '../composables/useFrameValue.js';
 
 const state = useFrameValue(() => {
   if (!transport.recording) return { text: '', flash: false };
   const b = currentBeat();
   return {
-    text: b < tp.startBeat ? `Count-in ${Math.ceil((tp.startBeat - b) / beatLen() - 1e-9)}` : `REC  ·  ${rec.taps.length} taps`,
+    // counts down with the clicks; before the first click sounds (start-up and output delay) it already shows the full count
+    text: b < tp.startBeat ? `Count-in ${Math.min(ui.countIn, Math.ceil((tp.startBeat - b) / beatLen() - 1e-9))}` : `REC  ·  ${rec.taps.length} taps`,
     flash: performance.now() - rec.flashTap < 90,
   };
 });

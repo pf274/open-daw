@@ -503,6 +503,24 @@ describe('time signature', () => {
     expect(clicks.slice(0, 7)).toEqual([[0, true], [0.5, false], [1, false], [1.5, false], [2, false], [2.5, false], [3, true]]);
   });
 
+  it('the count-in clicks exactly its number of beats, also when the playhead is between beats (no doubled clicks)', async () => {
+    const synth = await import('../src/audio/synth.js');
+    const { startRecording } = await import('../src/engine/recorder.js');
+    const { exitPick } = await import('../src/engine/pick.js');
+    for (const ph of [0, 4.25, 1.1]) {
+      ui.view = 'pattern'; ui.countIn = 4; ui.metronome = false; ui.playhead = ph; project.bpm = 100; project.settings.recTempo = 0;
+      synth.click.mockClear();
+      clock.t = 0;
+      await startRecording(true);
+      for (let t = 0; t < 4; t += 0.02) { clock.t = t; schedule(); } // many small scheduling steps, like the real timer
+      stopTransport();
+      exitPick();
+      const times = synth.click.mock.calls.map(([t]) => t);
+      expect(times).toHaveLength(4);
+      expect(new Set(times.map((t) => t.toFixed(6))).size).toBe(4);
+    }
+  });
+
   it('is saved, loaded, written to MIDI and defaults to 4/4 for old files', async () => {
     const { setTimeSig } = await import('../src/engine/editing.js');
     const { writeMidi } = await import('../src/core/midi.js');
