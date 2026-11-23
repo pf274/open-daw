@@ -40,10 +40,11 @@ const TAP_FIELDS = [
   ['gapMs', 'Gap before next note', 'Silence left before the following tap.', { step: 5, min: 0 }, (st) => st.durMode === 'legato', 'ms'],
   ['tapShift', 'Tap offset', 'Moves every tap later (+) or earlier (−) to make up for keyboard or audio delay. Try it if recorded notes land consistently early or late.', { step: 5 }, () => true, 'ms'],
 ];
+const inWindow = (st) => st.pitchFrom === 'window';
 const PITCH_FIELDS = [
-  ['winStart', 'Pitch window start', 'Where, relative to each tap, the pitch starts being measured (negative = before the tap).', { step: 10 }, 'ms'],
-  ['winLen', 'Pitch window length', 'How long after that the pitch is measured. Shorten it for fast melodies.', { step: 10, min: 20 }, 'ms'],
-  ['minClarity', 'Min pitch clarity', 'How clear a sound must be to count as a pitch (0–1). Raise it if breath or noise gives wrong notes; lower it if notes are missed.', { step: 0.05, min: 0, max: 1 }, ''],
+  ['winStart', 'Window start', 'Where, relative to each tap, the pitch starts being measured (negative = before the tap).', { step: 10 }, 'ms', inWindow],
+  ['winLen', 'Window length', 'How long after that the pitch is measured.', { step: 10, min: 20 }, 'ms', inWindow],
+  ['minClarity', 'Min pitch clarity', 'How clear a sound must be to count as a pitch (0–1). Raise it if breath or noise gives wrong notes; lower it if notes are missed.', { step: 0.05, min: 0, max: 1 }, '', () => true],
 ];
 
 /* key & scale: a named scale in a key, or notes picked one by one */
@@ -239,7 +240,14 @@ function realign() {
 
       <div class="sub">
         <h4>Reading the pitch <span>(● Rec only)</span></h4>
-        <label v-for="[key, label, tip, attrs, unit] in PITCH_FIELDS" :key="key" :title="tip">
+        <label title="Which part of each note its pitch is taken from">Pitch from
+          <select v-model="project.settings.pitchFrom" aria-label="Pitch from">
+            <option value="note">the whole note (average)</option>
+            <option value="window">a window around the tap</option>
+          </select>
+          <small class="help-text">{{ project.settings.pitchFrom === 'window' ? 'The middle value heard in a short window at the start of each note.' : 'The average pitch over the whole note, ignoring brief slides and slips.' }}</small>
+        </label>
+        <label v-for="[key, label, tip, attrs, unit, show] in PITCH_FIELDS" v-show="show(project.settings)" :key="key" :title="tip">
           {{ label }} <input v-model.number="project.settings[key]" type="number" v-bind="attrs" :aria-label="label"> {{ unit }}
           <small class="help-text">{{ tip }}</small>
         </label>

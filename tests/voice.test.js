@@ -59,3 +59,30 @@ describe('scales', () => {
     expect(snapToScale(61, 0, 'major')).toBe(60); // the named-scale form still works
   });
 });
+
+describe('pitch from the whole note', () => {
+  const base = { winStart: -50, winLen: 300, tapShift: 0, durMode: 'legato', fixedBeats: 0.5, gapMs: 20, transpose: 0, humTranspose: 0, scaleRoot: 0, scale: 'chromatic', minClarity: 0.7, vel: 96 };
+  // one 1-second note (frames every 10 ms), a second tap at 1 s ends it
+  const take = (pitchAt) => ({
+    bpm: 60, startBeat: 0, endT: 2,
+    frames: Array.from({ length: 200 }, (_, i) => ({ t: i * 0.01, midi: pitchAt(i * 0.01), c: 0.95 })),
+    taps: [{ down: 0, up: 0.9 }, { down: 1, up: 1.9 }],
+  });
+
+  it('averages over the whole note by default; the window mode only hears the start', () => {
+    const drifting = take((t) => (t < 0.3 ? 63.4 : 64.3)); // starts flat, settles a little sharp of E
+    expect(alignTake(drifting, base).notes[0].pitch).toBe(64);
+    expect(alignTake(drifting, { ...base, pitchFrom: 'note' }).notes[0].pitch).toBe(64);
+    expect(alignTake(drifting, { ...base, pitchFrom: 'window' }).notes[0].pitch).toBe(63);
+  });
+
+  it('brief slips (an octave jump, a scoop) barely move the average', () => {
+    const slips = take((t) => (t > 0.4 && t < 0.5 ? 76 : t < 0.08 ? 58 : 64));
+    expect(alignTake(slips, base).notes[0].pitch).toBe(64);
+  });
+
+  it('stops at the next note', () => {
+    const two = take((t) => (t < 1 ? 60 : 67));
+    expect(alignTake(two, base).notes.map((n) => n.pitch)).toEqual([60, 67]);
+  });
+});

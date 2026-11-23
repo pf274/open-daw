@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS = {
   durMode: 'legato',   // legato | hold | fixed
   fixedBeats: 0.5,
   gapMs: 20,
+  pitchFrom: 'note',   // each note's pitch: 'note' = average over the whole note, 'window' = median in the window below
   winStart: -50,       // pitch window start relative to tap (ms)
   winLen: 300,         // pitch window length (ms)
   tapShift: 0,         // latency compensation (ms)

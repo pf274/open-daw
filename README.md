@@ -21,12 +21,12 @@ npm run build      # static production build in dist/
 1. In **Settings → Recording**, choose whether you'll **whistle** or **hum or sing**, then press **🎤 Mic** and try it. The readout next to it shows the detected note and what it maps to after transposition. (You can skip the mic check: **● Rec** switches the mic on by itself.)
 2. Pick a layer, set the playhead (click the ruler), press **● Rec** or `R`.
 3. After the count-in, whistle (or hum) and **tap any key once per note**. `Esc` stops.
-4. Tap times set the rhythm. Each note's pitch is the median pitch heard in a short window around its tap.
+4. Tap times set the rhythm. Each note's pitch is the average pitch heard over the whole note, from its tap to where it ends. Brief slides and slips, like the lowest and highest fifth of what's heard, are left out of the average.
 5. Edit in the piano roll, add layers, then **⬇ MIDI** exports every audible layer (SMF type 1, one track per layer, GM program and volume set).
 
 If notes come out wrong, change the options under **Settings → Recording** and press **Re-align last take**. The raw pitch trace and taps are saved, so you don't need to record again. Each setting there says which tool it affects:
 - *Note length*: until next tap (legato), how long you held the key, or fixed.
-- *Pitch window start/length*: where pitch is sampled relative to each tap.
+- *Pitch from*: **the whole note (average)**, the default, or **a window around the tap**, which takes the middle value heard in a short window at each note's start. Use the window if you slide between notes and want the start of each one. *Window start/length* set that window relative to the tap.
 - *Tap offset*: shifts every tap (latency compensation).
 - *Whistle / hum*: humming and singing are much lower than whistling (about 65–1000 Hz instead of 400–4500 Hz), so **hum or sing** makes the pitch detector listen lower. Each mode has its own transpose: whistling sits around C5–C7 and the default −12 drops it an octave, while a hum stays where you sing it (0). A take remembers which mode it was recorded in, so re-aligning keeps the right transpose.
 - *Min pitch clarity*: raise it if breath or noise turns into wrong notes, lower it if notes are missed.

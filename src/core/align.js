@@ -8,6 +8,17 @@
 import { scaleNotes, snapToNotes } from './scales.js';
 import { pitchShift } from './voice.js';
 
+/**
+ * Average that ignores the outliers: the mean of the middle 60 % of the values (the lowest and
+ * highest fifth dropped), so a scoop into a note, a breath or an octave slip barely moves it.
+ */
+export function trimmedMean(arr) {
+  const a = arr.slice().sort((x, y) => x - y);
+  const cut = a.length >= 5 ? Math.floor(a.length * 0.2) : 0;
+  const mid = a.slice(cut, a.length - cut);
+  return mid.reduce((sum, x) => sum + x, 0) / mid.length;
+}
+
 export function median(arr) {
   const a = arr.slice().sort((x, y) => x - y);
   const n = a.length;
@@ -44,17 +55,27 @@ export function rhythmFromTaps(take, s) {
   }));
 }
 
-/** Whistle + taps → { notes:[{start,dur,pitch,vel}], skipped } (beats). */
+/**
+ * Whistle + taps → { notes:[{start,dur,pitch,vel}], skipped } (beats).
+ * Each note's pitch: s.pitchFrom 'note' (default) averages the pitch over the whole note;
+ * 'window' takes the median in a short window around its tap (s.winStart / s.winLen).
+ */
 export function alignTake(take, s) {
   const notes = [];
   let skipped = 0;
   const spb = 60 / take.bpm;
   const voiced = take.frames.filter((f) => f.midi > 0 && f.c >= s.minClarity);
 
+  const wholeNote = s.pitchFrom !== 'window';
   for (const { t, end, prevT, nextT } of tapSlots(take, s)) {
-    // pitch window: around the tap, never reaching into neighbouring notes
-    const wStart = Math.max(t + s.winStart / 1000, prevT === -Infinity ? -Infinity : (prevT + t) / 2);
-    const wEnd = Math.min(t + s.winLen / 1000, nextT);
+    let wStart, wEnd;
+    if (wholeNote) { // the whole note: from its tap to its end (never into the next note)
+      wStart = t;
+      wEnd = Math.min(end, nextT);
+    } else { // a window around the tap, never reaching into neighbouring notes
+      wStart = Math.max(t + s.winStart / 1000, prevT === -Infinity ? -Infinity : (prevT + t) / 2);
+      wEnd = Math.min(t + s.winLen / 1000, nextT);
+    }
     let sel = voiced.filter((f) => f.t >= wStart && f.t <= wEnd);
     if (!sel.length) {
       // fall back to the nearest voiced frame within 400 ms
@@ -66,7 +87,8 @@ export function alignTake(take, s) {
       if (best) sel = [best];
     }
     if (!sel.length) { skipped++; continue; }
-    let m = median(sel.map((f) => f.midi)) + pitchShift(s, take);
+    // average pitch over the note (in semitones, i.e. the average on a musical scale), or the window's median
+    let m = (wholeNote ? trimmedMean : median)(sel.map((f) => f.midi)) + pitchShift(s, take);
     m = snapToNotes(m, scaleNotes(s));
     m = Math.max(0, Math.min(127, m));
     notes.push({
