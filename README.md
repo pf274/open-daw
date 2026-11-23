@@ -21,7 +21,7 @@ npm run build      # static production build in dist/
 1. In **Settings → Recording**, choose whether you'll **whistle** or **hum or sing**, then press **🎤 Mic** and try it. The readout next to it shows the detected note and what it maps to after transposition. (You can skip the mic check: **● Rec** switches the mic on by itself.)
 2. Pick a layer, set the playhead (click the ruler), press **● Rec** or `R`.
 3. After the count-in, whistle (or hum) and **tap any key once per note**. `Esc` stops.
-4. Tap times set the rhythm. Each note's pitch is the average pitch heard over the whole note, from its tap to where it ends. Brief slides and slips, like the lowest and highest fifth of what's heard, are left out of the average.
+4. Tap times set the rhythm. Each note's pitch is the average pitch heard over the whole note, from its tap to where it ends. Silence doesn't count, and neither do moments much quieter than the note itself, such as the fading tail of a whistle or background noise in a gap. Brief slides and slips, like the lowest and highest fifth of what's heard, are left out of the average too.
 5. Edit in the piano roll, add layers, then **⬇ MIDI** exports every audible layer (SMF type 1, one track per layer, GM program and volume set).
 
 If notes come out wrong, change the options under **Settings → Recording** and press **Re-align last take**. The raw pitch trace and taps are saved, so you don't need to record again. Each setting there says which tool it affects:

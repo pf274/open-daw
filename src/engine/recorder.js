@@ -31,10 +31,12 @@ transportHooks.onRecordStart = ({ t0Perf, bpm }) => {
   rec.bpm = bpm;
 };
 
-setPitchSink(({ midi, clarity }, perfCentre) => {
+setPitchSink(({ midi, clarity, rms = null }, perfCentre) => {
   if (!transport.recording) return;
   const t = (perfCentre - rec.t0) / 1000;
-  if (t > -0.5) rec.frames.push({ t: +t.toFixed(4), midi: +midi.toFixed(3), c: +clarity.toFixed(3) });
+  const f = { t: +t.toFixed(4), midi: +midi.toFixed(3), c: +clarity.toFixed(3) };
+  if (rms != null) f.r = +rms.toFixed(4); // loudness: quiet frames (fade-outs, background) are left out of a note's pitch
+  if (t > -0.5) rec.frames.push(f);
 });
 
 export function onTapDown(e) {

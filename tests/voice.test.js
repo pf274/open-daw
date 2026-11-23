@@ -81,6 +81,19 @@ describe('pitch from the whole note', () => {
     expect(alignTake(slips, base).notes[0].pitch).toBe(64);
   });
 
+  it('leaves silence and near-silence out of the average (a quiet fade-out, noise in a gap)', () => {
+    const t = take(() => 0);
+    t.frames = t.frames.map((f) => {
+      if (f.t >= 1) return { ...f, midi: 67, r: 0.2 };
+      if (f.t < 0.5) return { ...f, midi: 64, r: 0.2 };          // the note, loud
+      if (f.t < 0.6) return { ...f, midi: 0, c: 0, r: 0.001 };   // true silence: no pitch at all
+      return { ...f, midi: 59.6, r: 0.03 };                      // a faint tail / background, read as a low pitch
+    });
+    expect(alignTake(t, base).notes[0].pitch).toBe(64); // without the loudness check this averages to 62
+    const old = { ...t, frames: t.frames.map(({ r, ...f }) => f) }; // an older take without loudness: as before
+    expect(alignTake(old, base).notes[0].pitch).toBe(62);
+  });
+
   it('stops at the next note', () => {
     const two = take((t) => (t < 1 ? 60 : 67));
     expect(alignTake(two, base).notes.map((n) => n.pitch)).toEqual([60, 67]);

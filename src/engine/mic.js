@@ -70,7 +70,7 @@ function poll() {
   live.clarity = r.clarity;
   live.midi = r.freq ? freqToMidi(r.freq) : 0;
   // timestamp the centre of the analysis window
-  if (sink) sink({ midi: live.midi, clarity: r.clarity }, performance.now() - (buf.length / 2 / sr) * 1000);
+  if (sink) sink({ midi: live.midi, clarity: r.clarity, rms: r.rms }, performance.now() - (buf.length / 2 / sr) * 1000);
 }
 
 // Holds app state: hot-swapping this module would leave stale copies in memory

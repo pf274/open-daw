@@ -1,7 +1,8 @@
 /**
  * Turning a recorded take into notes.
  *
- * take: { bpm, startBeat, endT, frames:[{t,midi,c}], taps:[{down,up}], mode? ('whistle' | 'hum') }
+ * take: { bpm, startBeat, endT, frames:[{t,midi,c,r?}], taps:[{down,up}], mode? ('whistle' | 'hum') }
+ *   frames.r is the loudness (RMS) of the frame; takes recorded before it existed don't have it
  *   times are seconds where 0 = startBeat; frames.midi is 0 when unvoiced.
  * settings: the project's alignment settings (see stores/project.js DEFAULT_SETTINGS)
  */
@@ -17,6 +18,22 @@ export function trimmedMean(arr) {
   const cut = a.length >= 5 ? Math.floor(a.length * 0.2) : 0;
   const mid = a.slice(cut, a.length - cut);
   return mid.reduce((sum, x) => sum + x, 0) / mid.length;
+}
+
+/** Frames quieter than this share of the note's loud level (about −10 dB) don't count towards its pitch. */
+export const QUIET_SHARE = 0.3;
+
+/**
+ * Only the frames where you were actually sounding the note: anything much quieter than the note's
+ * loud part (the tail as a whistle fades, background noise in a gap) is dropped. The loud level is the
+ * 90th percentile, so one spike doesn't set it. Frames without a loudness (older takes) are all kept.
+ */
+export function soundingFrames(frames) {
+  if (frames.length < 3 || frames.some((f) => f.r == null)) return frames;
+  const levels = frames.map((f) => f.r).sort((a, b) => a - b);
+  const loud = levels[Math.min(levels.length - 1, Math.floor(levels.length * 0.9))];
+  const kept = frames.filter((f) => f.r >= loud * QUIET_SHARE);
+  return kept.length ? kept : frames;
 }
 
 export function median(arr) {
@@ -76,7 +93,7 @@ export function alignTake(take, s) {
       wStart = Math.max(t + s.winStart / 1000, prevT === -Infinity ? -Infinity : (prevT + t) / 2);
       wEnd = Math.min(t + s.winLen / 1000, nextT);
     }
-    let sel = voiced.filter((f) => f.t >= wStart && f.t <= wEnd);
+    let sel = soundingFrames(voiced.filter((f) => f.t >= wStart && f.t <= wEnd)); // silence and near-silence don't count
     if (!sel.length) {
       // fall back to the nearest voiced frame within 400 ms
       let best = null, bd = 0.4;

@@ -245,7 +245,7 @@ function realign() {
             <option value="note">the whole note (average)</option>
             <option value="window">a window around the tap</option>
           </select>
-          <small class="help-text">{{ project.settings.pitchFrom === 'window' ? 'The middle value heard in a short window at the start of each note.' : 'The average pitch over the whole note, ignoring brief slides and slips.' }}</small>
+          <small class="help-text">{{ project.settings.pitchFrom === 'window' ? 'The middle value heard in a short window at the start of each note.' : 'The average pitch over the whole note, ignoring silence, quiet moments, and brief slides and slips.' }}</small>
         </label>
         <label v-for="[key, label, tip, attrs, unit, show] in PITCH_FIELDS" v-show="show(project.settings)" :key="key" :title="tip">
           {{ label }} <input v-model.number="project.settings[key]" type="number" v-bind="attrs" :aria-label="label"> {{ unit }}
