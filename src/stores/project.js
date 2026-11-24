@@ -276,6 +276,7 @@ function loadLayer(t) {
     ...t,
     take: t.take ? markRaw(t.take) : null,
     ...(t.inst === 'custom' ? { synth: normalizePatch(t.synth) } : {}),
+    ...(t.inst === 'recorded' ? { program: Math.max(1, Math.min(128, Math.round(+t.program) || 66)) } : {}),
   };
 }
 

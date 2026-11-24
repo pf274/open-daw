@@ -107,6 +107,28 @@ describe('App (mounted)', () => {
     await tab(w, 'Settings').trigger('click');
   });
 
+  it('a layer can play a recorded instrument: pick it, choose the GM instrument; saved and exported', async () => {
+    const { serialize, loadProjectData } = await import('../src/stores/project.js');
+    const { buildSong } = await import('../src/engine/files.js');
+    const tr = curTrack();
+    const before = tr.inst;
+    const inst = w.find('.track select');
+    await inst.setValue('recorded');
+    expect(tr.inst).toBe('recorded');
+    expect(tr.program).toBeGreaterThan(0);
+    const prog = w.find('select[aria-label="Recorded instrument"]');
+    expect(prog.findAll('optgroup').map((g) => g.attributes('label'))).toContain('Reed');
+    await prog.setValue('67'); // Tenor Sax
+    expect(tr.program).toBe(67);
+    tr.notes = [{ id: 99001, start: 0, dur: 1, pitch: 60, vel: 90 }];
+    expect(buildSong('pattern').tracks[0].program).toBe(66);
+    loadProjectData(JSON.parse(serialize()));
+    expect(curTrack()).toMatchObject({ inst: 'recorded', program: 67 });
+    curTrack().notes = [];
+    curTrack().inst = before;
+    await flushPromises();
+  });
+
   it('adds a drum layer and selects it', async () => {
     await w.findAll('button').find((b) => b.text() === '+ Add drums').trigger('click');
     expect(project.tracks).toHaveLength(2);

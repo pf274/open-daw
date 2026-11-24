@@ -43,3 +43,11 @@ export const GM_SAMPLE_NAMES = [
   'guitar_fret_noise', 'breath_noise', 'seashore', 'bird_tweet', 'telephone_ring', 'helicopter',
   'applause', 'gunshot',
 ];
+
+/** The 16 General MIDI families of 8 programs each (index = (program − 1) >> 3). */
+export const GM_FAMILIES = [
+  'Piano', 'Chromatic percussion', 'Organ', 'Guitar', 'Bass', 'Strings', 'Ensemble', 'Brass',
+  'Reed', 'Pipe', 'Synth lead', 'Synth pad', 'Synth effects', 'Ethnic', 'Percussive', 'Sound effects',
+];
+/** GM programs grouped by family: [[family, [{ program (1-based), name }]]]. */
+export const GM_BY_FAMILY = GM_FAMILIES.map((family, f) => [family, GM_PROGRAMS.slice(f * 8, f * 8 + 8).map((name, i) => ({ program: f * 8 + i + 1, name }))]);

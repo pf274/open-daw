@@ -7,12 +7,16 @@ import { normalizePatch, presetPatch, makeFilter, MAX_FILTERS, makeEffect, MAX_E
 import { project, curTrack } from '../stores/project.js';
 import { ui, status, selNotes } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
+import { gmProgramFor } from '../audio/instruments.js';
+import { DEFAULT_PROGRAM } from '../audio/recorded.js';
 
 const trackById = (id) => project.tracks.find((t) => t.id === id);
 export const editingTrack = () => trackById(ui.synthModal.trackId);
 
 /** Change a layer's instrument; switching to 'custom' gives it a patch if it has none. */
 export function setInstrument(tr, inst) {
+  // switching to a recorded instrument: start from the same kind of instrument (marimba → recorded marimba)
+  if (inst === 'recorded' && !tr.program) tr.program = tr.inst === 'drums' ? DEFAULT_PROGRAM : gmProgramFor(tr) + 1;
   tr.inst = inst;
   if (inst === 'custom' && !tr.synth) tr.synth = normalizePatch(); // fresh copy (own filters array)
 }

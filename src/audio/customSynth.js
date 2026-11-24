@@ -160,6 +160,20 @@ export const PRESETS = {
       { type: 'amplifier', freq: 2600, width: 0.5, gain: 8 },
     ],
     vibDepth: 9, vibRate: 5.3, reverb: { amount: 0.5, decay: 3.5, tone: 0.5, preDelay: 0.04 }, gm: 53 },
+  /*
+   * Saxophone: a reedy saw with a square an octave below for body; the tone "blooms" as the low-pass
+   * opens at each note's start; two amplifiers at the sax's resonances (~500 Hz body, ~1.5 kHz nasal
+   * bite); a touch of grit and room. MIDI export: Alto Sax.
+   */
+  'Sax': { wave: 'sawtooth', osc2Wave: 'square', osc2Octave: -1, osc2Level: 0.3, attack: 0.04, decay: 0.3, sustain: 0.85, release: 0.15,
+    filters: [
+      { type: 'lowpass', freq: 1800, resonance: 2, env: env('freq', 1, 0.06, 0.35, 0.4, 0.15) },
+      { type: 'amplifier', freq: 500, width: 0.6, gain: 10 },
+      { type: 'amplifier', freq: 1500, width: 0.6, gain: 8 },
+      { type: 'highpass', freq: 120, resonance: 0 },
+    ],
+    vibDepth: 8, vibRate: 5.2, effects: [{ type: 'distortion', drive: 0.15, tone: 0.5, mix: 0.3 }],
+    reverb: { amount: 0.25, decay: 1.8, tone: 0.5, preDelay: 0.02 }, gm: 66 },
   'Hollow flute': { wave: 'triangle', osc2Wave: 'sine', osc2Octave: 1, osc2Level: 0.15, attack: 0.08, decay: 0.2, sustain: 0.9, release: 0.2,
     filters: [{ type: 'bandpass', freq: 1800, width: 1.5 }, { type: 'highpass', freq: 250, resonance: 0 }], vibDepth: 10, vibRate: 5, reverb: { amount: 0.3, decay: 2, tone: 0.6, preDelay: 0.02 }, gm: 74 },
 };
@@ -169,8 +183,9 @@ export const PRESET_GROUPS = [
   ['Start', ['Init']],
   ['Bass', ['Fat bass', 'Acid bass', 'Sub bass']],
   ['Leads', ['Square lead', 'Supersaw lead', 'Chiptune', 'Funky wah', 'Wah pluck', 'Pluck', 'Dub stab']],
-  ['Pads & keys', ['Soft pad', 'Warm strings', 'Dreamy keys', 'Organ', 'Glass', 'Swell brass']],
-  ['Voices & character', ['Cat meow', 'Choir ah', 'Hollow flute']],
+  ['Pads & keys', ['Soft pad', 'Warm strings', 'Dreamy keys', 'Organ', 'Glass']],
+  ['Winds & brass', ['Sax', 'Swell brass', 'Hollow flute']],
+  ['Voices & character', ['Cat meow', 'Choir ah']],
 ];
 
 /** Convert a pre-filter-chain patch (filterType/cutoff/resonance) to a filters array. */

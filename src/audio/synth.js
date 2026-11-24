@@ -5,6 +5,7 @@ import { playDrum } from './drums.js';
 import { midiToFreq } from '../core/pitch.js';
 import { automateGlides, makeTremor } from './modulation.js';
 import { playPiano } from './piano.js';
+import { playRecorded } from './recorded.js';
 
 const FREQ_MIN = 20, FREQ_MAX = 20000;
 const clampHz = (hz) => Math.max(FREQ_MIN, Math.min(FREQ_MAX, hz));
@@ -40,7 +41,11 @@ function applyFilterEnvelope(f, fs, when, off) {
  */
 export function playVoice(dest, inst, midi, when, dur, vel, { glides = null, tremor = null } = {}) {
   const actx = getCtx();
-  const spec = typeof inst === 'object' && inst ? inst : INSTRUMENTS[inst] || INSTRUMENTS.piano;
+  let spec = typeof inst === 'object' && inst ? inst : INSTRUMENTS[inst] || INSTRUMENTS.piano;
+  if (spec.sampled) { // a recorded instrument: its recording, or (still loading / offline) the stand-in synth
+    if (playRecorded(dest, spec, midi, when, dur, vel, { glides, tremor })) return;
+    spec = spec.fallback;
+  }
   if (spec.drums) { playDrum(dest, midi, when, vel); return; }
   if (spec.piano) { playPiano(dest, midi, when, dur, vel, { glides, tremor }); return; }
   const freq = midiToFreq(midi);

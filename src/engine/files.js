@@ -19,7 +19,7 @@ import { getCtx, withContext, buildMasterChain } from '../audio/context.js';
 import { stopTransport } from './transport.js';
 import { exitPick } from './pick.js';
 import { scheduleTrack } from './voices.js';
-import { ensurePianoSamples, pianoNotesFor } from './samples.js';
+import { ensurePianoSamples, pianoNotesFor, ensureRecordedSamples, recordedNotesFor } from './samples.js';
 import { buildSongGraph } from './automation.js';
 import { pianoSamplesEnabled } from '../audio/piano.js';
 import { scheduleSoundClips, soundBuffer } from '../audio/soundBank.js';
@@ -132,7 +132,12 @@ export const renderLength = (scope = exportScope()) => (scope === 'song' ? songL
  *                    an offline render); return false to stop it (the promise then rejects).
  */
 export async function renderSong(sampleRate = 44100, scope = exportScope(), { onSamples = null, onProgress = null } = {}) {
-  if (pianoSamplesEnabled()) { onSamples?.(); await ensurePianoSamples(pianoNotesFor(playedLayers(scope))); } // render the real piano
+  const recorded = recordedNotesFor(playedLayers(scope));
+  if (pianoSamplesEnabled() || recorded.size) onSamples?.();
+  await Promise.all([
+    pianoSamplesEnabled() ? ensurePianoSamples(pianoNotesFor(playedLayers(scope))) : null, // render the real piano
+    ensureRecordedSamples(recorded), // and the recorded instruments
+  ]);
   const spb = 60 / project.bpm;
   const off = new OfflineAudioContext(2, Math.ceil(renderLength(scope) * sampleRate), sampleRate);
   const master = buildMasterChain(off, ui.masterVol);

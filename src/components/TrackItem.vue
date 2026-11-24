@@ -3,6 +3,9 @@ import { INSTRUMENTS } from '../audio/instruments.js';
 import { project, isDrum, audible } from '../stores/project.js';
 import { viewDrums } from '../stores/view.js';
 import { audition } from '../engine/mix.js';
+import { GM_BY_FAMILY } from '../core/gm.js';
+import { clampProgram } from '../audio/recorded.js';
+import { recordedSamples } from '../engine/samples.js';
 import { setInstrument, openSynthEditor } from '../engine/synthEditor.js';
 
 // Tracks are store objects: editing their fields in place is intentional.
@@ -11,8 +14,13 @@ defineEmits(['select', 'remove']);
 
 const INST_OPTIONS = Object.entries(INSTRUMENTS).map(([k, v]) => ({
   value: k,
-  label: v.custom ? `${v.name} (editable)` : `${v.name} (${v.drums ? 'GM ch 10' : 'GM ' + (v.gm + 1)})`,
+  label: v.custom ? `${v.name} (editable)` : v.recorded ? `${v.name} (real samples)…` : `${v.name} (${v.drums ? 'GM ch 10' : 'GM ' + (v.gm + 1)})`,
 }));
+
+function onProgram(e) {
+  props.track.program = clampProgram(e.target.value);
+  audition(props.track, 67);
+}
 
 function onInstrument(e) {
   const t = props.track;
@@ -20,6 +28,8 @@ function onInstrument(e) {
   if (isDrum(t)) {
     if (t.id === project.sel) viewDrums();
     audition(t, 38);
+  } else if (t.inst === 'recorded') {
+    audition(t, 67);
   } else if (t.inst === 'custom') {
     openSynthEditor(t.id); // straight into the editor the first time
   } else audition(t, 72);
@@ -41,6 +51,15 @@ function onInstrument(e) {
       </select>
       <button v-if="track.inst === 'custom'" class="small" title="Edit this layer's synth sound" @click="openSynthEditor(track.id)">Edit synth…</button>
     </div>
+    <div v-if="track.inst === 'recorded'" class="row">
+      <select :value="clampProgram(track.program)" aria-label="Recorded instrument" title="Which instrument's recordings to play (General MIDI; also used for MIDI export)" @change="onProgram">
+        <optgroup v-for="[family, progs] in GM_BY_FAMILY" :key="family" :label="family">
+          <option v-for="p in progs" :key="p.program" :value="p.program">{{ p.name }}</option>
+        </optgroup>
+      </select>
+      <small v-if="recordedSamples.loading" class="count">loading…</small>
+      <small v-else-if="recordedSamples.failed" class="count warn" title="Some recordings couldn't be downloaded; a synth stands in for those notes until you're online">offline</small>
+    </div>
     <div class="row">
       <label style="flex:none">Vol</label>
       <input v-model.number="track.vol" type="range" min="0" max="1" step="0.01">
@@ -59,4 +78,5 @@ function onInstrument(e) {
 input[type=range] { flex: 1; }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .count { color: var(--dim); font-size: 11px; min-width: 56px; text-align: right; }
+.count.warn { color: var(--warn); }
 </style>

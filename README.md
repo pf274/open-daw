@@ -184,6 +184,14 @@ Piano layers play **recordings of a real grand piano**: the free FluidR3 GM acou
 - **Downloads:** each note is a ~25 KB file, fetched when needed and cached. Once a piano layer exists, the notes it uses plus the middle of the keyboard (C3–C6) load in the background, so playback is instant. A note that isn't loaded yet plays the modelled piano once while it downloads. **WAV export** waits for every piano note it needs, so the file always has the real piano.
 - **Modelled piano:** used offline, while loading, or with **Settings → Playback → Recorded piano** turned off (then nothing is downloaded). It's an additive model with slightly stretched overtones, high overtones dying faster than low ones, a quick first decay then a long ring, gently beating double strings, a hammer "thunk", and longer decays in the bass.
 
+## Recorded instruments
+
+For a realistic sound, set a layer's instrument to **Recorded instrument (real samples)** and pick one of the 128 General MIDI instruments in the second dropdown, grouped by family: saxophones (Soprano, Alto, Tenor, Baritone) under *Reed*, plus trumpet, strings, guitars, flutes, choir and more. Switching to it starts from the same kind of instrument the layer had (a marimba layer becomes a recorded marimba).
+
+- The sound comes from the same free FluidR3 GM recordings as the recorded piano: one ~25 KB file per note, downloaded the first time a note is needed and kept for offline use afterwards. The notes a project uses are fetched in the background, and WAV export waits for them.
+- While a note's file is still loading, or when you're offline, a synth from the same family stands in (for saxophones and other reeds, the **Sax** preset). The layer card shows *loading…* or *offline*.
+- Each recording is a few seconds long. Instruments that hold their sound (reeds, brass, strings, organs, flutes, synth leads and pads) loop a steady stretch for longer notes; plucked and struck instruments ring out. Slides bend the recording; tremor and transpose work as usual. MIDI export uses the chosen instrument.
+
 ## Custom synth
 
 Set a layer's instrument to **Custom synth** and the synth editor opens. You can reopen it later with **Edit synth…** on the layer card. Each custom layer has its own sound:
@@ -198,8 +206,9 @@ Set a layer's instrument to **Custom synth** and the synth editor opens. You can
 - **Presets**, grouped in the dropdown. Use one as a starting point:
   - *Bass:* Fat bass, Acid bass (squelchy resonant sweep), Sub bass
   - *Leads:* Square lead, Supersaw lead, Chiptune, Wah pluck, Pluck
-  - *Pads & keys:* Soft pad, Warm strings, Organ, Glass, Swell brass
-  - *Voices & character:* **Cat meow** (a low-pass and a Frequency Amplifier that snap open, then sweep down together: "mm-aa-owww"), Choir ah (Frequency Amplifiers on the "ah" vowel's formants at ~700, 1220 and 2600 Hz), Hollow flute
+  - *Pads & keys:* Soft pad, Warm strings, Organ, Glass
+  - *Winds & brass:* **Sax** (a reedy saw over a square an octave down; a low-pass that blooms open on each note; Frequency Amplifiers at ~500 Hz and ~1.5 kHz for the sax's body and nasal bite; a little grit and room; MIDI export as Alto Sax), Swell brass, Hollow flute
+  - *Voices & character:* **Cat meow** (a low-pass and a Frequency Amplifier that snap open, then sweep down together: "mm-aa-owww"), Choir ah (Frequency Amplifiers on the "ah" vowel's formants at ~700, 1220 and 2600 Hz)
 
 ### Effects tab
 

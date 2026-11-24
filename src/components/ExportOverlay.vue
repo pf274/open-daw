@@ -6,7 +6,7 @@ import { exportState, cancelExport } from '../engine/files.js';
 const R = 26, CIRC = 2 * Math.PI * R;
 const pct = computed(() => (exportState.progress == null ? null : Math.round(exportState.progress * 100)));
 const label = computed(() => ({
-  samples: 'Loading piano samples…',
+  samples: 'Loading recorded instruments…',
   render: `Rendering the ${exportState.scope}…`,
   encode: 'Writing the WAV file…',
 }[exportState.phase] || 'Exporting…'));

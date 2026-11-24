@@ -24,7 +24,7 @@ import { installKeyboard } from './engine/keyboard.js';
 import { startFrameLoop } from './engine/frame.js';
 import { applyMix } from './engine/mix.js';
 import { refreshSongMix } from './engine/transport.js';
-import { installPianoPreload } from './engine/samples.js';
+import { installPianoPreload, installRecordedPreload } from './engine/samples.js';
 import { installTheme } from './stores/theme.js';
 import { installLongPress, installNoPageZoom } from './composables/touch.js';
 import { device } from './stores/device.js';
@@ -48,6 +48,7 @@ let offLongPress = null, offNoZoom = null;
 onUnmounted(() => { offLongPress?.(); offNoZoom?.(); });
 onMounted(() => {
   installPianoPreload();
+  installRecordedPreload();
   installAutosave();
   installPrefs();
   installKeyboard();

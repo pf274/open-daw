@@ -16,7 +16,7 @@ describe('WAV export progress overlay', () => {
     expect(w.find('.card').exists()).toBe(false);
     Object.assign(exportState, { rendering: true, phase: 'samples', progress: null, scope: 'song' });
     await nextTick();
-    expect(w.text()).toContain('Loading piano samples');
+    expect(w.text()).toContain('Loading recorded instruments');
     expect(w.find('svg').classes()).toContain('spin');
     expect(w.find('.pct').exists()).toBe(false);
     Object.assign(exportState, { phase: 'render', progress: 0.42 });

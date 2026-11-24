@@ -1,4 +1,5 @@
-import { patchToSpec, normalizePatch } from './customSynth.js';
+import { patchToSpec, normalizePatch, PRESETS } from './customSynth.js';
+import { recordedSpec, clampProgram } from './recorded.js';
 
 /**
  * Instrument catalogue (pure data). To add an instrument, add an entry here.
@@ -9,6 +10,7 @@ import { patchToSpec, normalizePatch } from './customSynth.js';
  *  vib:      vibrato depth in cents
  *  drums:    rendered by audio/drums.js and exported on channel 10
  *  piano:    rendered by audio/piano.js (sampled grand, synthesized fallback)
+ *  recorded: any GM instrument from real recordings (audio/recorded.js); the layer's `program` picks it
  */
 export const INSTRUMENTS = {
   piano:    { name: 'Piano', gm: 0, piano: true }, // audio/piano.js: recorded grand (or a modelled one offline)
@@ -24,13 +26,28 @@ export const INSTRUMENTS = {
   square:   { name: 'Square lead', gm: 80, partials: [['square', 1, 0.6]], a: 0.008, s: 1, dt: 0.05, r: 0.06, lp: 6 },
   saw:      { name: 'Saw lead', gm: 81, partials: [['sawtooth', 1, 0.6]], a: 0.008, s: 1, dt: 0.05, r: 0.06, lp: 7 },
   drums:    { name: 'Drum kit', gm: 0, drums: true },
+  recorded: { name: 'Recorded instrument', gm: 65, recorded: true }, // real samples of a GM instrument (layer.program)
   custom:   { name: 'Custom synth', gm: 81, custom: true }, // sound comes from the layer's `synth` patch
 };
 
 export const isDrumInst = (key) => !!(INSTRUMENTS[key] && INSTRUMENTS[key].drums);
 
 /** The voice spec a layer plays with: its custom patch, or the built-in instrument. */
-export const specFor = (tr) => (tr.inst === 'custom' ? patchToSpec(tr.synth) : INSTRUMENTS[tr.inst] || INSTRUMENTS.piano);
+export const specFor = (tr) => (tr.inst === 'custom' ? patchToSpec(tr.synth)
+  : tr.inst === 'recorded' ? recordedSpec(tr.program, standIn)
+  : INSTRUMENTS[tr.inst] || INSTRUMENTS.piano);
+
+/**
+ * What a recorded instrument plays while its recordings load (or offline): the closest synth
+ * from the same GM family.
+ */
+const FAMILY_STAND_INS = ['piano', 'marimba', 'organ', 'guitar', 'bass', 'strings', 'strings', 'brass',
+  'sax', 'flute', 'saw', 'strings', 'saw', 'guitar', 'marimba', 'saw'];
+const saxSpec = patchToSpec(PRESETS.Sax);
+function standIn(program) {
+  const key = FAMILY_STAND_INS[(program - 1) >> 3] || 'saw';
+  return key === 'sax' ? saxSpec : INSTRUMENTS[key];
+}
 
 /** The layer's reverb settings when it has one switched on (custom synth layers), else null. */
 export function reverbFor(tr) {
@@ -49,4 +66,6 @@ export function fxFor(tr) {
 }
 
 /** GM program (0-based) used when exporting the layer to MIDI. */
-export const gmProgramFor = (tr) => (tr.inst === 'custom' ? normalizePatch(tr.synth).gm - 1 : (INSTRUMENTS[tr.inst] || INSTRUMENTS.piano).gm);
+export const gmProgramFor = (tr) => (tr.inst === 'custom' ? normalizePatch(tr.synth).gm - 1
+  : tr.inst === 'recorded' ? clampProgram(tr.program) - 1
+  : (INSTRUMENTS[tr.inst] || INSTRUMENTS.piano).gm);
