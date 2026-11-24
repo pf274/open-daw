@@ -136,6 +136,31 @@ describe('Song view', () => {
   });
 });
 
+describe('track volume slider', () => {
+  it('sets the track volume; one drag is one undo step', async () => {
+    const { mount, flushPromises } = await import('@vue/test-utils');
+    const App = (await import('../src/App.vue')).default;
+    const { project, resetProject } = await import('../src/stores/project.js');
+    const { ui } = await import('../src/stores/ui.js');
+    const { undo, clearHistory } = await import('../src/stores/history.js');
+    resetProject();
+    clearHistory();
+    ui.view = 'song';
+    const w = mount(App, { attachTo: document.body });
+    await flushPromises();
+    const name = project.song.tracks[0].name;
+    const slider = w.find(`input[aria-label="Volume of ${name}"]`);
+    expect(slider.element.value).toBe('1');
+    await slider.trigger('pointerdown');
+    for (const v of ['0.8', '0.6', '0.5']) { slider.element.value = v; await slider.trigger('input'); }
+    await slider.trigger('change');
+    expect(project.song.tracks[0].vol).toBe(0.5);
+    undo();
+    expect(project.song.tracks[0].vol).toBe(1);
+    w.unmount();
+  });
+});
+
 describe('Song view snap', () => {
   it('the corner snap selector changes where drops land', async () => {
     resetProject();

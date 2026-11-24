@@ -565,6 +565,32 @@ describe('song playback with automation', () => {
   });
 });
 
+describe('track volume', () => {
+  it('each song track plays at its own volume (old tracks: full), and changes apply while playing', async () => {
+    const { refreshSongMix } = await import('../src/engine/transport.js');
+    const p = curPattern();
+    p.layers[0].notes = [note(1, 0, 1, 60)];
+    const [t1, t2] = project.song.tracks;
+    S.addClip(t2.id, p.id, 4);
+    t1.vol = 0.4;
+    delete t2.vol; // a track saved before track volume existed
+    voices.length = 0;
+    clock.t = 0;
+    startTransport(0, { song: true });
+    clock.t = 60;
+    schedule();
+    const [v1, v2] = voices.sort((a, b) => a[3] - b[3]);
+    const trackInput = (v) => v[0].out[0]; // layer gain → track input (its volume)
+    expect(trackInput(v1).gain.value).toBeCloseTo(0.4);
+    expect(trackInput(v2).gain.value).toBe(1);
+    t1.vol = 0.75;
+    refreshSongMix();
+    expect(trackInput(v1).gain.value).toBeCloseTo(0.75);
+    stopTransport();
+    expect(P.makeSongTrack().vol).toBe(1);
+  });
+});
+
 describe('clip clipboard', () => {
   it('copy keeps the arrangement; paste lands at the playhead on the same tracks and moves the playhead on', () => {
     const p = curPattern(); // 1 bar long

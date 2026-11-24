@@ -8,7 +8,7 @@
  */
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue';
 import { clamp } from '../core/music.js';
-import { project, patternById, patternLength, songLength, nid, barLen, beatLen, songRows, orderedTracks, soundById, clipLength, clipTrim, fullClipLength, MIN_CLIP, sortedSections, songTrackAudible } from '../stores/project.js';
+import { project, patternById, patternLength, songLength, nid, barLen, beatLen, songRows, orderedTracks, soundById, clipLength, clipTrim, fullClipLength, MIN_CLIP, sortedSections, songTrackAudible, songTrackVol } from '../stores/project.js';
 import { snapRound, snapFloor, formatPosition } from '../core/meter.js';
 import { ui, HEAD_W, saveHeadW, toggleHeadCollapsed } from '../stores/ui.js';
 import { takeSnapshot, commitUndo } from '../stores/history.js';
@@ -603,6 +603,11 @@ function onWheel(e) {
   ui.barPx = clamp(ui.barPx * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 24, 320);
 }
 
+/* track volume: one undo step per slider drag */
+let volSnap = null;
+const volStart = () => { if (!volSnap) volSnap = takeSnapshot(); };
+const volCommit = () => { if (volSnap) commitUndo(volSnap); volSnap = null; };
+
 function onRemoveTrack(t) {
   const n = clipsOf(t).length;
   if (n && !confirm(`Delete "${t.name}" and its ${n} clip${n === 1 ? '' : 's'}?`)) return;
@@ -773,6 +778,11 @@ function onRemoveAutomation(a) {
               <button class="small inline" :class="{ on: r.item.mute }" title="Mute track" @click="r.item.mute = !r.item.mute">M</button>
               <button class="small inline" :class="{ on: r.item.solo }" title="Solo track" @click="r.item.solo = !r.item.solo">S</button>
               <button class="small del inline" title="Delete track" :aria-label="`Delete ${r.item.name}`" @click="onRemoveTrack(r.item)">✕</button>
+              <label class="track-vol" :title="`Track volume: ${Math.round(songTrackVol(r.item) * 100)}%`">
+                <span aria-hidden="true">Vol</span>
+                <input type="range" min="0" max="1" step="0.01" :value="songTrackVol(r.item)" :aria-label="`Volume of ${r.item.name}`"
+                  @pointerdown="volStart" @keydown="volStart" @input="r.item.vol = +$event.target.value" @change="volCommit">
+              </label>
             </div>
             <div class="lane" :class="{ muted: !songTrackAudible(r.item) }" :style="laneBg"
               @dragover="onDragOver" @drop.prevent="onDrop($event, r.item)" @dblclick.self="onNativeLaneDblClick($event, r.item)" @pointerup.self="onLaneUp($event, r.item)"
@@ -895,6 +905,10 @@ function onRemoveAutomation(a) {
 .head .del { opacity: 0; transition: opacity .1s; }
 .lane-row:hover .del, .head:focus-within .del { opacity: 1; } /* destructive: only when you're on the row */
 .head .name { padding: 2px 5px; }
+.lane-row .head { flex-wrap: wrap; align-content: center; row-gap: 1px; }
+.track-vol { flex-basis: 100%; display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--dim); font-size: 10px; padding-left: 20px; }
+.track-vol input { flex: 1; min-width: 0; height: 14px; margin: 0; }
+@media (pointer: coarse) { .track-vol input { height: 20px; } }
 .corner { position: sticky; }
 .resizer { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 5; }
 .resizer::after { content: ''; position: absolute; top: 4px; bottom: 4px; left: 3px; width: 2px; border-radius: 1px; background: transparent; }

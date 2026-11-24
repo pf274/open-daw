@@ -41,6 +41,7 @@ watch(() => [ui.view, device.narrow], () => { ui.drawer = false; });
 
 // keep audio in sync with volume / mute / solo (every pattern's layers) and the master volume
 watch(() => project.patterns.map((p) => p.layers.map((t) => [t.id, t.vol, t.mute, t.solo])), () => { applyMix(); refreshSongMix(); }, { deep: true });
+watch(() => project.song.tracks.map((t) => t.vol), () => refreshSongMix()); // track volume while the song plays
 watch(() => ui.masterVol, setMasterVolume, { immediate: true });
 
 let offLongPress = null, offNoZoom = null;

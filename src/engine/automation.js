@@ -10,7 +10,7 @@ import { valueAt, sampleCurve, DEFAULT_EASE } from '../core/automation.js';
 import { AUTOMATION_EFFECTS } from '../audio/effects.js';
 import { createFxChain } from '../audio/fxChain.js';
 import { fxFor } from '../audio/instruments.js';
-import { project, makeAutomation, audible, normalizeOrder, songRows } from '../stores/project.js';
+import { project, makeAutomation, audible, normalizeOrder, songRows, songTrackById, songTrackVol } from '../stores/project.js';
 import { ui, status } from '../stores/ui.js';
 import { pushUndo } from '../stores/history.js';
 
@@ -130,7 +130,8 @@ export function buildSongGraph(ctx, master, opts) {
 
   function chainFor(trackId) {
     if (chains.has(trackId)) return chains.get(trackId);
-    const input = ctx.createGain();
+    const input = ctx.createGain(); // the track's volume, before its automation
+    input.gain.value = songTrackVol(songTrackById(trackId));
     nodes.push(input);
     let tail = input;
     const from = curveStart();
@@ -184,8 +185,9 @@ export function buildSongGraph(ctx, master, opts) {
       }
       return soundGains.get(key).node;
     },
-    /** Re-apply layer volume/mute/solo (and sound volumes) while playing. */
+    /** Re-apply track volumes, layer volume/mute/solo and sound volumes while playing. */
     updateMix() {
+      for (const [trackId, input] of chains) input.gain.value = songTrackVol(songTrackById(trackId));
       for (const { node, layer } of layerGains.values()) node.gain.value = audible(layer) ? layer.vol : 0;
       for (const { node, sound } of soundGains.values()) node.gain.value = sound.vol;
     },

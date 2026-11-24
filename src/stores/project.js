@@ -127,8 +127,10 @@ export function patternLength(p) {
 /* ---------------- song ---------------- */
 export function makeSongTrack(name) {
   const i = project.song.tracks.length;
-  return { id: nid(), name: name || `Track ${i + 1}`, color: COLORS[i % COLORS.length], mute: false, solo: false };
+  return { id: nid(), name: name || `Track ${i + 1}`, color: COLORS[i % COLORS.length], mute: false, solo: false, vol: 1 };
 }
+/** A song track's volume (0–1); tracks from before it existed play at full volume. */
+export const songTrackVol = (st) => (st && Number.isFinite(+st.vol) ? Math.max(0, Math.min(1, +st.vol)) : 1);
 export const songTrackById = (id) => project.song.tracks.find((t) => t.id === id);
 export function songTrackAudible(st) {
   const anySolo = project.song.tracks.some((t) => t.solo);
