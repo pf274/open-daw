@@ -905,7 +905,7 @@ function onRemoveAutomation(a) {
 .head .del { opacity: 0; transition: opacity .1s; }
 .lane-row:hover .del, .head:focus-within .del { opacity: 1; } /* destructive: only when you're on the row */
 .head .name { padding: 2px 5px; }
-.lane-row .head { flex-wrap: wrap; align-content: center; row-gap: 1px; }
+.lane-row:not(.auto-row) .head { flex-wrap: wrap; align-content: center; row-gap: 1px; } /* track rows: the Vol slider on a second line (automation rows stack their own lines) */
 .track-vol { flex-basis: 100%; display: flex; align-items: center; gap: 4px; min-width: 0; color: var(--dim); font-size: 10px; padding-left: 20px; }
 .track-vol input { flex: 1; min-width: 0; height: 14px; margin: 0; }
 @media (pointer: coarse) { .track-vol input { height: 20px; } }
